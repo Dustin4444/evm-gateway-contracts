@@ -19,6 +19,7 @@ pragma solidity ^0.8.29;
 
 import {GatewayCommon} from "src/GatewayCommon.sol";
 import {Burns} from "src/modules/wallet/Burns.sol";
+import {ContractSignersWhitelist} from "src/modules/wallet/ContractSignersWhitelist.sol";
 import {Deposits} from "src/modules/wallet/Deposits.sol";
 import {Withdrawals} from "src/modules/wallet/Withdrawals.sol";
 
@@ -51,7 +52,7 @@ import {Withdrawals} from "src/modules/wallet/Withdrawals.sol";
 /// the process of being withdrawn will no longer be available as soon as the withdrawal initiation is observed by the
 /// operator in a finalized block. If a double-spend was attempted, the contract will burn the user's funds from both
 /// their `available` and `withdrawing` balances.
-contract GatewayWallet is GatewayCommon, Deposits, Withdrawals, Burns {
+contract GatewayWallet is GatewayCommon, Deposits, Withdrawals, ContractSignersWhitelist, Burns {
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
         // Ensure that the implementation contract cannot be initialized, only the proxy
@@ -63,13 +64,14 @@ contract GatewayWallet is GatewayCommon, Deposits, Withdrawals, Burns {
     /// @dev Assumes the contract is being deployed behind a proxy and that the proxy has already been initialized using
     ///      the `UpgradeablePlaceholder` contract
     ///
-    /// @param pauser_            The address to initialize the `pauser` role
-    /// @param denylister_        The address to initialize the `denylister` role
-    /// @param supportedTokens_   The list of tokens to support initially
-    /// @param domain_            The operator-issued identifier for this chain
-    /// @param withdrawalDelay_   The initial value for `withdrawalDelay`, in blocks
-    /// @param burnSigner_        The address to initialize the `burnSigner` role
-    /// @param feeRecipient_      The address to initialize the `feeRecipient` role
+    /// @param pauser_                        The address to initialize the `pauser` role
+    /// @param denylister_                    The address to initialize the `denylister` role
+    /// @param supportedTokens_               The list of tokens to support initially
+    /// @param domain_                        The operator-issued identifier for this chain
+    /// @param withdrawalDelay_               The initial value for `withdrawalDelay`, in blocks
+    /// @param burnSigner_                    The address to initialize the `burnSigner` role
+    /// @param feeRecipient_                  The address to initialize the `feeRecipient` role
+    /// @param contractSignersWhitelister_    The address to initialize the `contractSignersWhitelister` role
     function initialize(
         address pauser_,
         address denylister_,
@@ -77,10 +79,12 @@ contract GatewayWallet is GatewayCommon, Deposits, Withdrawals, Burns {
         uint32 domain_,
         uint256 withdrawalDelay_,
         address burnSigner_,
-        address feeRecipient_
+        address feeRecipient_,
+        address contractSignersWhitelister_
     ) external reinitializer(2) {
         __GatewayCommon_init(pauser_, denylister_, supportedTokens_, domain_);
         __Withdrawals_init(withdrawalDelay_);
+        __ContractSignersWhitelist_init(contractSignersWhitelister_);
         __Burns_init(burnSigner_, feeRecipient_);
     }
 }

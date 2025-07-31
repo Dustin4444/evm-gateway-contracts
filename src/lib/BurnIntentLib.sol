@@ -18,6 +18,7 @@
 pragma solidity ^0.8.29;
 
 import {TypedMemView} from "@memview-sol/TypedMemView.sol";
+import {AddressLib} from "src/lib/AddressLib.sol";
 import {
     BurnIntent,
     BurnIntentSet,
@@ -30,7 +31,7 @@ import {
     BURN_INTENT_TRANSFER_SPEC_OFFSET,
     BURN_INTENT_SET_NUM_INTENTS_OFFSET,
     BURN_INTENT_SET_INTENTS_OFFSET,
-    BURN_INTENT_TYPEHASH, // solhint-disable-line no-unused-import, only used in assembly
+    BURN_INTENT_TYPEHASH,
     BURN_INTENT_SET_TYPEHASH
 } from "src/lib/BurnIntents.sol";
 import {Cursor} from "src/lib/Cursor.sol";
@@ -459,5 +460,31 @@ library BurnIntentLib {
         }
 
         return keccak256(abi.encodePacked(BURN_INTENT_SET_TYPEHASH, keccak256(abi.encodePacked(intentHashes))));
+    }
+
+    /// Extracts the source signer from a burn intent or burn intent set
+    ///
+    /// @dev For a burn intent set, returns the source signer from the first intent
+    ///      (all intents in a set must have the same signer)
+    ///
+    /// @param intent   The encoded burn intent or burn intent set
+    /// @return         The source signer address
+    function getSourceSigner(bytes memory intent) internal pure returns (address) {
+        bytes29 ref = _asIntentOrSetView(intent);
+        bytes29 transferSpec;
+
+        if (_isSet(ref)) {
+            // For intent sets, get the first intent's transfer spec
+            Cursor memory c = cursor(intent);
+            bytes29 firstIntent = next(c);
+            transferSpec = getTransferSpec(firstIntent);
+        } else {
+            // For single intents, get the transfer spec directly
+            transferSpec = getTransferSpec(ref);
+        }
+
+        // Extract and convert the source signer from bytes32 to address
+        bytes32 signerBytes = TransferSpecLib.getSourceSigner(transferSpec);
+        return AddressLib._bytes32ToAddress(signerBytes);
     }
 }
