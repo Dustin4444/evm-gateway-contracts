@@ -30,13 +30,13 @@ import {Cursor} from "src/lib/Cursor.sol";
 import {EIP712Domain} from "src/lib/EIP712Domain.sol";
 import {TransferSpecLib} from "src/lib/TransferSpecLib.sol";
 import {Balances} from "src/modules/wallet/Balances.sol";
-import {ContractSignersWhitelist} from "src/modules/wallet/ContractSignersWhitelist.sol";
+import {ContractSignersAllowlist} from "src/modules/wallet/ContractSignersAllowlist.sol";
 import {Delegation} from "src/modules/wallet/Delegation.sol";
 
 /// @title Burns
 ///
 /// @notice Manages burns for the `GatewayWallet` contract
-contract Burns is GatewayCommon, Balances, Delegation, ContractSignersWhitelist, EIP712Domain {
+contract Burns is GatewayCommon, Balances, Delegation, ContractSignersAllowlist, EIP712Domain {
     using TransferSpecLib for bytes29;
     using BurnIntentLib for bytes29;
     using BurnIntentLib for Cursor;
@@ -311,27 +311,27 @@ contract Burns is GatewayCommon, Balances, Delegation, ContractSignersWhitelist,
 
         // Validate signature and get the effective signer
         bytes32 digest = _hashTypedData(BurnIntentLib.getTypedDataHash(intent));
-        address signer = _validateSignatureAndGetSigner(intent, digest, signature);
+        address signer = _validateSignatureAndGetSigner(cursor, digest, signature);
         _processIntentsAndBurn(cursor, signer, fees);
     }
 
     /// Validates signature using ECDSA or EIP-1271 and returns the effective signer
     ///
-    /// @param intent      The byte-encoded burn intent or burn intent set
+    /// @param cursor      The cursor positioned at the burn intent(s)
     /// @param digest      The typed data hash to validate
     /// @param signature   The signature to validate
     /// @return signer     The validated signer address
-    function _validateSignatureAndGetSigner(bytes memory intent, bytes32 digest, bytes memory signature)
+    function _validateSignatureAndGetSigner(Cursor memory cursor, bytes32 digest, bytes memory signature)
         private
         view
         returns (address signer)
     {
-        // Get the source signer from the intent (for sets, this gets the first intent's signer)
-        address sourceSigner = BurnIntentLib.getSourceSigner(intent);
+        // Get the source signer from the cursor (for sets, this gets the first intent's signer)
+        address sourceSigner = BurnIntentLib._getSourceSignerFromCursor(cursor);
 
-        if (isWhitelistedContractSigner(sourceSigner)) {
-            // For whitelisted contracts, use EIP-1271 signature validation
-            if (!SignatureChecker.isValidSignatureNow(sourceSigner, digest, signature)) {
+        if (isAllowlistedContractSigner(sourceSigner)) {
+            // For allowlisted contracts, use EIP-1271 signature validation
+            if (!SignatureChecker.isValidERC1271SignatureNow(sourceSigner, digest, signature)) {
                 revert InvalidSignature();
             }
             return sourceSigner;

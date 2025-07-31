@@ -24,6 +24,7 @@ import {GatewayWallet} from "src/GatewayWallet.sol";
 import {AddressLib} from "src/lib/AddressLib.sol";
 import {BurnIntentLib} from "src/lib/BurnIntentLib.sol";
 import {BurnIntent, BurnIntentSet} from "src/lib/BurnIntents.sol";
+import {Cursor} from "src/lib/Cursor.sol";
 import {TransferSpec, TRANSFER_SPEC_VERSION} from "src/lib/TransferSpec.sol";
 import {Burns} from "src/modules/wallet/Burns.sol";
 import {FiatTokenV2_2} from "test/mock_fiattoken/contracts/v2/FiatTokenV2_2.sol";
@@ -67,7 +68,7 @@ contract GatewayWalletBurnsEIP1271Test is SignatureTestUtils, DeployUtils {
     uint256 private contractOwnerKey = uint256(keccak256(abi.encodePacked("contractOwner")));
     address private depositor = makeAddr("depositor");
     uint256 private depositorKey = uint256(keccak256(abi.encodePacked("depositor")));
-    address private whitelister = makeAddr("whitelister");
+    address private allowlister = makeAddr("allowlister");
     uint256 private burnSignerKey;
     address private burnSigner;
 
@@ -96,7 +97,7 @@ contract GatewayWalletBurnsEIP1271Test is SignatureTestUtils, DeployUtils {
             wallet.addSupportedToken(address(usdc));
             wallet.addBurnSigner(burnSigner);
             wallet.updateFeeRecipient(feeRecipient);
-            wallet.updateContractSignersWhitelister(whitelister);
+            wallet.updateContractSignersAllowlister(allowlister);
         }
         vm.stopPrank();
 
@@ -116,8 +117,8 @@ contract GatewayWalletBurnsEIP1271Test is SignatureTestUtils, DeployUtils {
         vm.stopPrank();
 
         // Whitelist the valid contract signer
-        vm.prank(whitelister);
-        wallet.whitelistContractSigner(address(validContractSigner));
+        vm.prank(allowlister);
+        wallet.allowlistContractSigner(address(validContractSigner));
     }
 
     function _setupUSDCBurning() internal {
@@ -358,8 +359,8 @@ contract GatewayWalletBurnsEIP1271Test is SignatureTestUtils, DeployUtils {
 
     function test_burnIntent_withContractThatReturnsInvalid_reverts() public {
         // First whitelist the invalid contract signer
-        vm.prank(whitelister);
-        wallet.whitelistContractSigner(address(invalidContractSigner));
+        vm.prank(allowlister);
+        wallet.allowlistContractSigner(address(invalidContractSigner));
 
         // Add delegate authorization
         vm.prank(depositor);
@@ -481,7 +482,8 @@ contract GatewayWalletBurnsEIP1271Test is SignatureTestUtils, DeployUtils {
         BurnIntent memory intent = _createBurnIntent(address(validContractSigner), 1000e6);
         bytes memory encodedIntent = BurnIntentLib.encodeBurnIntent(intent);
 
-        address sourceSigner = BurnIntentLib.getSourceSigner(encodedIntent);
+        Cursor memory cursor = BurnIntentLib.cursor(encodedIntent);
+        address sourceSigner = BurnIntentLib._getSourceSignerFromCursor(cursor);
         assertEq(sourceSigner, address(validContractSigner), "Should return contract signer address");
     }
 
@@ -489,7 +491,8 @@ contract GatewayWalletBurnsEIP1271Test is SignatureTestUtils, DeployUtils {
         BurnIntent memory intent = _createBurnIntent(depositor, 1000e6);
         bytes memory encodedIntent = BurnIntentLib.encodeBurnIntent(intent);
 
-        address sourceSigner = BurnIntentLib.getSourceSigner(encodedIntent);
+        Cursor memory cursor = BurnIntentLib.cursor(encodedIntent);
+        address sourceSigner = BurnIntentLib._getSourceSignerFromCursor(cursor);
         assertEq(sourceSigner, depositor, "Should return EOA signer address");
     }
 
@@ -506,7 +509,8 @@ contract GatewayWalletBurnsEIP1271Test is SignatureTestUtils, DeployUtils {
         BurnIntentSet memory intentSet = BurnIntentSet({intents: intents});
         bytes memory encodedIntentSet = BurnIntentLib.encodeBurnIntentSet(intentSet);
 
-        address sourceSigner = BurnIntentLib.getSourceSigner(encodedIntentSet);
+        Cursor memory cursor = BurnIntentLib.cursor(encodedIntentSet);
+        address sourceSigner = BurnIntentLib._getSourceSignerFromCursor(cursor);
         assertEq(sourceSigner, address(validContractSigner), "Should return first intent's signer address");
     }
 }

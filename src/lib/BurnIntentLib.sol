@@ -31,7 +31,7 @@ import {
     BURN_INTENT_TRANSFER_SPEC_OFFSET,
     BURN_INTENT_SET_NUM_INTENTS_OFFSET,
     BURN_INTENT_SET_INTENTS_OFFSET,
-    BURN_INTENT_TYPEHASH,
+    BURN_INTENT_TYPEHASH, // solhint-disable-line no-unused-import, only used in assembly
     BURN_INTENT_SET_TYPEHASH
 } from "src/lib/BurnIntents.sol";
 import {Cursor} from "src/lib/Cursor.sol";
@@ -248,6 +248,25 @@ library BurnIntentLib {
         c.done = (numIntents == 0); // If the set is empty, the cursor is immediately done
     }
 
+    /// Gets the `TypedMemView` reference to the current element without advancing the cursor
+    ///
+    /// @dev Does not modify the cursor's internal state. Reverts with `CursorOutOfBounds` if called
+    ///      when no elements are remaining.
+    ///
+    /// @param c      The `Cursor` struct
+    /// @return ref   The element the cursor is currently pointing at
+    function current(Cursor memory c) internal pure returns (bytes29 ref) {
+        if (c.done) {
+            revert TransferSpecLib.CursorOutOfBounds();
+        }
+
+        uint32 currentSpecLength =
+            uint32(c.memView.indexUint(c.offset + BURN_INTENT_TRANSFER_SPEC_LENGTH_OFFSET, UINT32_BYTES));
+        uint256 currentIntentTotalLength = BURN_INTENT_TRANSFER_SPEC_OFFSET + currentSpecLength;
+
+        ref = c.memView.slice(c.offset, currentIntentTotalLength, TransferSpecLib._toMemViewType(BURN_INTENT_MAGIC));
+    }
+
     /// Gets the `TypedMemView` reference to the next element and advances the cursor
     ///
     /// @dev Updates the cursor's internal state (`offset`, `index`, `done`). Reverts with `CursorOutOfBounds` if called
@@ -462,29 +481,14 @@ library BurnIntentLib {
         return keccak256(abi.encodePacked(BURN_INTENT_SET_TYPEHASH, keccak256(abi.encodePacked(intentHashes))));
     }
 
-    /// Extracts the source signer from a burn intent or burn intent set
+    /// Helper function to extract source signer from cursor without advancing it
     ///
-    /// @dev For a burn intent set, returns the source signer from the first intent
-    ///      (all intents in a set must have the same signer)
+    /// @dev Gets the current intent from cursor position and extracts its source signer
     ///
-    /// @param intent   The encoded burn intent or burn intent set
-    /// @return         The source signer address
-    function getSourceSigner(bytes memory intent) internal pure returns (address) {
-        bytes29 ref = _asIntentOrSetView(intent);
-        bytes29 transferSpec;
-
-        if (_isSet(ref)) {
-            // For intent sets, get the first intent's transfer spec
-            Cursor memory c = cursor(intent);
-            bytes29 firstIntent = next(c);
-            transferSpec = getTransferSpec(firstIntent);
-        } else {
-            // For single intents, get the transfer spec directly
-            transferSpec = getTransferSpec(ref);
-        }
-
-        // Extract and convert the source signer from bytes32 to address
-        bytes32 signerBytes = TransferSpecLib.getSourceSigner(transferSpec);
+    /// @param c   The cursor positioned at the intent to extract from
+    /// @return    The source signer address
+    function _getSourceSignerFromCursor(Cursor memory c) internal pure returns (address) {
+        bytes32 signerBytes = TransferSpecLib.getSourceSigner(getTransferSpec(current(c)));
         return AddressLib._bytes32ToAddress(signerBytes);
     }
 }

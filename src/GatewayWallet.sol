@@ -19,7 +19,7 @@ pragma solidity ^0.8.29;
 
 import {GatewayCommon} from "src/GatewayCommon.sol";
 import {Burns} from "src/modules/wallet/Burns.sol";
-import {ContractSignersWhitelist} from "src/modules/wallet/ContractSignersWhitelist.sol";
+import {ContractSignersAllowlist} from "src/modules/wallet/ContractSignersAllowlist.sol";
 import {Deposits} from "src/modules/wallet/Deposits.sol";
 import {Withdrawals} from "src/modules/wallet/Withdrawals.sol";
 
@@ -52,7 +52,7 @@ import {Withdrawals} from "src/modules/wallet/Withdrawals.sol";
 /// the process of being withdrawn will no longer be available as soon as the withdrawal initiation is observed by the
 /// operator in a finalized block. If a double-spend was attempted, the contract will burn the user's funds from both
 /// their `available` and `withdrawing` balances.
-contract GatewayWallet is GatewayCommon, Deposits, Withdrawals, ContractSignersWhitelist, Burns {
+contract GatewayWallet is GatewayCommon, Deposits, Withdrawals, ContractSignersAllowlist, Burns {
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
         // Ensure that the implementation contract cannot be initialized, only the proxy
@@ -71,7 +71,7 @@ contract GatewayWallet is GatewayCommon, Deposits, Withdrawals, ContractSignersW
     /// @param withdrawalDelay_               The initial value for `withdrawalDelay`, in blocks
     /// @param burnSigner_                    The address to initialize the `burnSigner` role
     /// @param feeRecipient_                  The address to initialize the `feeRecipient` role
-    /// @param contractSignersWhitelister_    The address to initialize the `contractSignersWhitelister` role
+    /// @param contractSignersAllowlister_    The address to initialize the `contractSignersAllowlister` role
     function initialize(
         address pauser_,
         address denylister_,
@@ -80,11 +80,11 @@ contract GatewayWallet is GatewayCommon, Deposits, Withdrawals, ContractSignersW
         uint256 withdrawalDelay_,
         address burnSigner_,
         address feeRecipient_,
-        address contractSignersWhitelister_
+        address contractSignersAllowlister_
     ) external reinitializer(2) {
         __GatewayCommon_init(pauser_, denylister_, supportedTokens_, domain_);
         __Withdrawals_init(withdrawalDelay_);
-        __ContractSignersWhitelist_init(contractSignersWhitelister_);
+        __ContractSignersAllowlist_init(contractSignersAllowlister_);
         __Burns_init(burnSigner_, feeRecipient_);
     }
 }
