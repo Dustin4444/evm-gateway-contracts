@@ -34,18 +34,12 @@ import {SignatureTestUtils} from "test/util/SignatureTestUtils.sol";
 // Mock EIP-1271 contract for testing
 contract MockEIP1271Signer is IERC1271 {
     address public owner;
-    mapping(bytes32 => bool) public validSignatures;
 
     constructor(address _owner) {
         owner = _owner;
     }
 
     function isValidSignature(bytes32 hash, bytes calldata signature) external view override returns (bytes4) {
-        // First check if this specific hash is marked as valid
-        if (validSignatures[hash]) {
-            return IERC1271.isValidSignature.selector;
-        }
-
         // Otherwise check if signature was made by owner
         address recoveredSigner = ECDSA.recover(hash, signature);
         if (recoveredSigner == owner) {
