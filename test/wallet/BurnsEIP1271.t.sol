@@ -58,6 +58,7 @@ contract MockInvalidEIP1271Signer is IERC1271 {
     }
 }
 
+// solhint-disable-next-line max-states-count
 contract GatewayWalletBurnsEIP1271Test is SignatureTestUtils, DeployUtils {
     using MessageHashUtils for bytes32;
 
