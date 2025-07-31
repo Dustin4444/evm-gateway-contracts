@@ -322,7 +322,7 @@ contract Burns is GatewayCommon, Balances, Delegation, ContractSignersWhitelist,
     /// @param signature   The signature to validate
     /// @return signer     The validated signer address
     function _validateSignatureAndGetSigner(bytes memory intent, bytes32 digest, bytes memory signature)
-        internal
+        private
         view
         returns (address signer)
     {

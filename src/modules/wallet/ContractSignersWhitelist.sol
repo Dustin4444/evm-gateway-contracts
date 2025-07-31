@@ -50,6 +50,12 @@ contract ContractSignersWhitelist is Initializable, Ownable2StepUpgradeable {
     /// @param contractAddr   The non-whitelisted contract address
     error ContractSignerNotWhitelisted(address contractAddr);
 
+    /// Thrown when attempting to set the zero address as a contract signer
+    error ZeroAddressContractSigner();
+
+    /// Thrown when attempting to set the zero address as the whitelister
+    error ZeroAddressWhitelister();
+
     /// Initializes the `contractSignersWhitelister` role
     ///
     /// @param whitelister_   The initial contract signers whitelister address
@@ -133,6 +139,9 @@ contract ContractSignersWhitelist is Initializable, Ownable2StepUpgradeable {
     /// @param contractAddr   The contract address to set the whitelist status for
     /// @param whitelisted    Whether or not the contract should be whitelisted
     function _setContractSignerWhitelist(address contractAddr, bool whitelisted) internal {
+        if (contractAddr == address(0)) {
+            revert ZeroAddressContractSigner();
+        }
         ContractSignersWhitelistStorage.get().whitelistMapping[contractAddr] = whitelisted;
     }
 
@@ -140,6 +149,9 @@ contract ContractSignersWhitelist is Initializable, Ownable2StepUpgradeable {
     ///
     /// @param newWhitelister   The new contract signers whitelister address
     function _setContractSignersWhitelister(address newWhitelister) internal {
+        if (newWhitelister == address(0)) {
+            revert ZeroAddressWhitelister();
+        }
         ContractSignersWhitelistStorage.get().whitelister = newWhitelister;
     }
 }

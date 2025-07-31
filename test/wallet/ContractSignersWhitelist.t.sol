@@ -158,6 +158,12 @@ contract ContractSignersWhitelistTest is Test {
         whitelistContract.updateContractSignersWhitelister(whitelister);
     }
 
+    function test_updateContractSignersWhitelister_revertIfZeroAddress() public {
+        vm.expectRevert(abi.encodeWithSelector(ContractSignersWhitelist.ZeroAddressWhitelister.selector));
+        vm.prank(owner);
+        whitelistContract.updateContractSignersWhitelister(address(0));
+    }
+
     function test_whitelistContractSigner_success() public {
         // Set whitelister
         vm.prank(owner);
@@ -185,6 +191,16 @@ contract ContractSignersWhitelistTest is Test {
         );
         vm.prank(unauthorized);
         whitelistContract.whitelistContractSigner(contractSigner);
+    }
+
+    function test_whitelistContractSigner_revertIfZeroAddress() public {
+        // Set whitelister
+        vm.prank(owner);
+        whitelistContract.updateContractSignersWhitelister(whitelister);
+
+        vm.expectRevert(abi.encodeWithSelector(ContractSignersWhitelist.ZeroAddressContractSigner.selector));
+        vm.prank(whitelister);
+        whitelistContract.whitelistContractSigner(address(0));
     }
 
     function test_whitelistContractSigner_isIdempotent() public {
@@ -253,6 +269,16 @@ contract ContractSignersWhitelistTest is Test {
         whitelistContract.unwhitelistContractSigner(contractSigner);
     }
 
+    function test_unwhitelistContractSigner_revertIfZeroAddress() public {
+        // Set whitelister
+        vm.prank(owner);
+        whitelistContract.updateContractSignersWhitelister(whitelister);
+
+        vm.expectRevert(abi.encodeWithSelector(ContractSignersWhitelist.ZeroAddressContractSigner.selector));
+        vm.prank(whitelister);
+        whitelistContract.unwhitelistContractSigner(address(0));
+    }
+
     function test_unwhitelistContractSigner_isIdempotent() public {
         // Set whitelister
         vm.prank(owner);
@@ -287,6 +313,13 @@ contract ContractSignersWhitelistTest is Test {
             abi.encodeWithSelector(ContractSignersWhitelist.ContractSignerNotWhitelisted.selector, contractSigner)
         );
         whitelistContract.checkOnlyWhitelistedContractSignerModifier(contractSigner);
+    }
+
+    function test_onlyWhitelistedContractSignerModifier_revertIfZeroAddress() public {
+        vm.expectRevert(
+            abi.encodeWithSelector(ContractSignersWhitelist.ContractSignerNotWhitelisted.selector, address(0))
+        );
+        whitelistContract.checkOnlyWhitelistedContractSignerModifier(address(0));
     }
 
     function test_onlyContractSignersWhitelisterModifier_success() public {
@@ -338,5 +371,35 @@ contract ContractSignersWhitelistTest is Test {
         assertTrue(whitelistContract.isWhitelistedContractSigner(contract1), "Contract1 should still be whitelisted");
         assertFalse(whitelistContract.isWhitelistedContractSigner(contract2), "Contract2 should be unwhitelisted");
         assertTrue(whitelistContract.isWhitelistedContractSigner(contract3), "Contract3 should still be whitelisted");
+    }
+
+    function test_isWhitelistedContractSigner_zeroAddressReturnsFalse() public {
+        assertFalse(whitelistContract.isWhitelistedContractSigner(address(0)), "Zero address should not be whitelisted");
+    }
+
+    function test_zeroAddressHandling_comprehensive() public {
+        // Set valid whitelister
+        vm.prank(owner);
+        whitelistContract.updateContractSignersWhitelister(whitelister);
+
+        // Verify zero address cannot be whitelisted
+        vm.expectRevert(abi.encodeWithSelector(ContractSignersWhitelist.ZeroAddressContractSigner.selector));
+        vm.prank(whitelister);
+        whitelistContract.whitelistContractSigner(address(0));
+
+        // Verify zero address cannot be unwhitelisted
+        vm.expectRevert(abi.encodeWithSelector(ContractSignersWhitelist.ZeroAddressContractSigner.selector));
+        vm.prank(whitelister);
+        whitelistContract.unwhitelistContractSigner(address(0));
+
+        // Verify zero address cannot be set as whitelister
+        vm.expectRevert(abi.encodeWithSelector(ContractSignersWhitelist.ZeroAddressWhitelister.selector));
+        vm.prank(owner);
+        whitelistContract.updateContractSignersWhitelister(address(0));
+
+        // Verify zero address is not whitelisted by default
+        assertFalse(
+            whitelistContract.isWhitelistedContractSigner(address(0)), "Zero address should never be whitelisted"
+        );
     }
 }
