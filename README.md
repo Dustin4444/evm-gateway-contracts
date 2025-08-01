@@ -122,7 +122,7 @@ We have chosen the following prefixes for our top-level contracts:
 | Production | Testnet | 0x0077777 | 0x0022222 | Add zero byte to mainnet addresses |
 | Staging | Testnet | 0x5577777 | 0x5522222 | 5 = "S" for Staging |
 
-To find and verify salts for the Wallet and Minter contracts, correctly set the `ENV` and `RPC_URL` environment variables (and possible `LOCAL_CREATE2_FACTORY_ADDRESS` depending on your environment). Use any values for all of the other variables, as they do not matter here.
+To find and verify salts for the Wallet and Minter contracts, correctly set the `ENV` and `RPC_URL` environment variables (and possibly `LOCAL_CREATE2_FACTORY_ADDRESS` depending on your environment). Use any values for all of the other variables, as they do not matter here.
 
 Simulate the deployments by running the below commands and note down the values initCodeHash from the logs of each command
 1. `ENV=$ENV forge script script/001_DeployGatewayWallet.sol --rpc-url $RPC_URL -vv`
