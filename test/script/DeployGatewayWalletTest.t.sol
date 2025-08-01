@@ -56,7 +56,7 @@ contract DeployGatewayWalletTest is Test {
         // Execute the deployment script and verify the addresses.
         (address placeholderAddress, address implAddress, address proxyAddress) = deployer.run();
         assertEq(placeholderAddress, 0x6D42049947A98EEde4893117C3dC7B043D002d64);
-        assertEq(implAddress, 0xc00C8FB6907d94769c93Ccd95552e8691908D1d9);
+        assertEq(implAddress, 0x8D6A6920D16d9C9c91bBd47C333bAf575BfCBc08);
         assertEq(proxyAddress, 0x483e6Cc03E5c6a85d6C1Cb0C6833110e23226EcB);
     }
 }
