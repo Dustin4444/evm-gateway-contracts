@@ -248,24 +248,6 @@ library BurnIntentLib {
         c.done = (numIntents == 0); // If the set is empty, the cursor is immediately done
     }
 
-    /// @dev Helper to get the current intent's TypedMemView and its total length from a cursor
-    /// @param c      The `Cursor` struct
-    /// @return ref   The element the cursor is currently pointing at
-    /// @return currentIntentTotalLength The total length in bytes of the current intent
-    function _getCurRefAndIntentTotalLength(Cursor memory c)
-        private
-        pure
-        returns (bytes29 ref, uint256 currentIntentTotalLength)
-    {
-        if (c.done) {
-            revert TransferSpecLib.CursorOutOfBounds();
-        }
-        uint32 currentSpecLength =
-            uint32(c.memView.indexUint(c.offset + BURN_INTENT_TRANSFER_SPEC_LENGTH_OFFSET, UINT32_BYTES));
-        currentIntentTotalLength = BURN_INTENT_TRANSFER_SPEC_OFFSET + currentSpecLength;
-        ref = c.memView.slice(c.offset, currentIntentTotalLength, TransferSpecLib._toMemViewType(BURN_INTENT_MAGIC));
-    }
-
     /// Gets the `TypedMemView` reference to the current element without advancing the cursor
     ///
     /// @dev Does not modify the cursor's internal state. Reverts with `CursorOutOfBounds` if called
@@ -273,8 +255,14 @@ library BurnIntentLib {
     ///
     /// @param c      The `Cursor` struct
     /// @return ref   The element the cursor is currently pointing at
-    function current(Cursor memory c) internal pure returns (bytes29 ref) {
-        (ref,) = _getCurRefAndIntentTotalLength(c);
+    function current(Cursor memory c) internal pure returns (bytes29) {
+        if (c.done) {
+            revert TransferSpecLib.CursorOutOfBounds();
+        }
+        uint32 currentSpecLength =
+            uint32(c.memView.indexUint(c.offset + BURN_INTENT_TRANSFER_SPEC_LENGTH_OFFSET, UINT32_BYTES));
+        uint256 currentIntentTotalLength = BURN_INTENT_TRANSFER_SPEC_OFFSET + currentSpecLength;
+        return c.memView.slice(c.offset, currentIntentTotalLength, TransferSpecLib._toMemViewType(BURN_INTENT_MAGIC));
     }
 
     /// Gets the `TypedMemView` reference to the next element and advances the cursor
@@ -285,10 +273,9 @@ library BurnIntentLib {
     /// @param c      The `Cursor` struct
     /// @return ref   The element the cursor was pointing at immediately before this function was called
     function next(Cursor memory c) internal pure returns (bytes29 ref) {
-        uint256 currentIntentTotalLength;
-        (ref, currentIntentTotalLength) = _getCurRefAndIntentTotalLength(c);
+        ref = current(c);
 
-        c.offset += currentIntentTotalLength;
+        c.offset += ref.len();
         c.index++;
 
         if (c.index >= c.numElements) {
