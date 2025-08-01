@@ -335,7 +335,7 @@ contract ContractSignersAllowlistTest is Test {
         assertTrue(allowlistContract.isAllowlistedContractSigner(contract3), "Contract3 should still be allowlisted");
     }
 
-    function test_isAllowlistedContractSigner_zeroAddressReturnsFalse() public {
+    function test_isAllowlistedContractSigner_zeroAddressReturnsFalse() public view {
         assertFalse(allowlistContract.isAllowlistedContractSigner(address(0)), "Zero address should not be allowlisted");
     }
 
