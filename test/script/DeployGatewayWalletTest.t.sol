@@ -44,6 +44,9 @@ contract DeployGatewayWalletTest is Test {
         vm.setEnv("GATEWAYWALLET_WITHDRAWAL_DELAY", "86400"); // 1 day
         vm.setEnv("GATEWAYWALLET_BURNSIGNER_ADDRESS", vm.toString(makeAddr("burnSigner")));
         vm.setEnv("GATEWAYWALLET_FEERECIPIENT_ADDRESS", vm.toString(makeAddr("feeRecipient")));
+        vm.setEnv(
+            "GATEWAYWALLET_CONTRACT_SIGNERS_ALLOWLISTER_ADDRESS", vm.toString(makeAddr("contractSignersAllowlister"))
+        );
 
         // Initialize the deployer script
         deployer = new DeployGatewayWallet();
@@ -53,7 +56,7 @@ contract DeployGatewayWalletTest is Test {
         // Execute the deployment script and verify the addresses.
         (address placeholderAddress, address implAddress, address proxyAddress) = deployer.run();
         assertEq(placeholderAddress, 0x6D42049947A98EEde4893117C3dC7B043D002d64);
-        assertEq(implAddress, 0xeB66e82BB2e8A8e6171015e6981689C96CFE5C06);
+        assertEq(implAddress, 0x8D6A6920D16d9C9c91bBd47C333bAf575BfCBc08);
         assertEq(proxyAddress, 0x483e6Cc03E5c6a85d6C1Cb0C6833110e23226EcB);
     }
 }

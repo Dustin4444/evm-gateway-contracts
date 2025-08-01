@@ -34,6 +34,7 @@ import {TransferSpecHashesStorage} from "src/modules/common/TransferSpecHashes.s
 import {MintsStorage} from "src/modules/minter/Mints.sol";
 import {BalancesStorage} from "src/modules/wallet/Balances.sol";
 import {BurnsStorage} from "src/modules/wallet/Burns.sol";
+import {ContractSignersAllowlistStorage} from "src/modules/wallet/ContractSignersAllowlist.sol";
 import {DelegationStorage} from "src/modules/wallet/Delegation.sol";
 import {WithdrawalDelayStorage} from "src/modules/wallet/WithdrawalDelay.sol";
 
@@ -124,6 +125,14 @@ contract TestMagicValues is Test {
         assertEq(
             WithdrawalDelayStorage.SLOT,
             keccak256(abi.encode(uint256(keccak256(bytes("circle.gateway.WithdrawalDelay"))) - 1))
+                & ~bytes32(uint256(0xff))
+        );
+    }
+
+    function test_ContractSignersAllowlistStorage_slot() external pure {
+        assertEq(
+            ContractSignersAllowlistStorage.SLOT,
+            keccak256(abi.encode(uint256(keccak256(bytes("circle.gateway.ContractSignersAllowlist"))) - 1))
                 & ~bytes32(uint256(0xff))
         );
     }
