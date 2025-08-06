@@ -329,7 +329,7 @@ contract Burns is GatewayCommon, Balances, Delegation, ContractSignersAllowlist,
         // Get the source signer from the cursor (for sets, this gets the first intent's signer)
         address sourceSigner = BurnIntentLib._getSourceSignerFromCursor(cursor);
 
-        if (_wasEverAllowlisted(sourceSigner)) {
+        if (_wasEverAllowlistedContractSigner(sourceSigner)) {
             // For allowlisted contracts, use EIP-1271 signature validation
             if (!SignatureChecker.isValidERC1271SignatureNow(sourceSigner, digest, signature)) {
                 revert InvalidSignature();

@@ -84,7 +84,8 @@ contract ContractSignersAllowlist is Initializable, Ownable2StepUpgradeable {
     /// @param contractAddr   The contract address to check
     /// @return               `true` if the contract is allowlisted, `false` otherwise
     function isAllowlistedContractSigner(address contractAddr) public view returns (bool) {
-        return ContractSignersAllowlistStorage.get().allowlistMapping[contractAddr] == ContractSignerAllowlistStatus.Allowlisted;
+        return ContractSignersAllowlistStorage.get().allowlistMapping[contractAddr]
+            == ContractSignerAllowlistStatus.Allowlisted;
     }
 
     /// The address with the `contractSignersAllowlister` role that can modify the allowlist
@@ -151,11 +152,7 @@ contract ContractSignersAllowlist is Initializable, Ownable2StepUpgradeable {
     ///
     /// @param contractAddr   The contract address to check
     /// @return               `true` if the address has ever been allowlisted, `false` otherwise
-    function _wasEverAllowlisted(address contractAddr)
-        internal
-        view
-        returns (bool)
-    {
+    function _wasEverAllowlistedContractSigner(address contractAddr) internal view returns (bool) {
         // A contract is always allowlisted for its own balance
         if (contractAddr == address(0)) return true;
 

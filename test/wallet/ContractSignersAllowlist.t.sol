@@ -30,8 +30,8 @@ contract ContractSignersAllowlistHarness is ContractSignersAllowlist {
     // Test function to expose the onlyContractSignersAllowlister modifier
     function checkOnlyContractSignersAllowlisterModifier() public onlyContractSignersAllowlister {}
 
-    function wasEverAllowlisted(address contractAddr) public view returns (bool) {
-        return _wasEverAllowlisted(contractAddr);
+    function wasEverAllowlistedContractSigner(address contractAddr) public view returns (bool) {
+        return _wasEverAllowlistedContractSigner(contractAddr);
     }
 }
 
@@ -170,7 +170,9 @@ contract ContractSignersAllowlistTest is Test {
         allowlistContract.allowlistContractSigner(contractSigner);
 
         assertTrue(allowlistContract.isAllowlistedContractSigner(contractSigner), "Contract should be allowlisted");
-        assertTrue(allowlistContract.wasEverAllowlisted(contractSigner), "Contract should have been allowlisted");
+        assertTrue(
+            allowlistContract.wasEverAllowlistedContractSigner(contractSigner), "Contract should have been allowlisted"
+        );
     }
 
     function test_allowlistContractSigner_revertIfNotAllowlister() public {
@@ -222,7 +224,9 @@ contract ContractSignersAllowlistTest is Test {
         assertTrue(
             allowlistContract.isAllowlistedContractSigner(contractSigner), "Contract should still be allowlisted"
         );
-        assertTrue(allowlistContract.wasEverAllowlisted(contractSigner), "Contract should have been allowlisted");
+        assertTrue(
+            allowlistContract.wasEverAllowlistedContractSigner(contractSigner), "Contract should have been allowlisted"
+        );
     }
 
     function test_disallowContractSigner_success() public {
@@ -245,7 +249,9 @@ contract ContractSignersAllowlistTest is Test {
         allowlistContract.disallowContractSigner(contractSigner);
 
         assertFalse(allowlistContract.isAllowlistedContractSigner(contractSigner), "Contract should be disallowed");
-        assertTrue(allowlistContract.wasEverAllowlisted(contractSigner), "Contract should have been allowlisted");
+        assertTrue(
+            allowlistContract.wasEverAllowlistedContractSigner(contractSigner), "Contract should have been allowlisted"
+        );
     }
 
     function test_disallowContractSigner_revertIfNotAllowlister() public {
@@ -289,7 +295,9 @@ contract ContractSignersAllowlistTest is Test {
         allowlistContract.disallowContractSigner(contractSigner);
 
         assertFalse(allowlistContract.isAllowlistedContractSigner(contractSigner), "Contract should remain disallowed");
-        assertTrue(allowlistContract.wasEverAllowlisted(contractSigner), "Contract should have been allowlisted");
+        assertTrue(
+            allowlistContract.wasEverAllowlistedContractSigner(contractSigner), "Contract should have been allowlisted"
+        );
     }
 
     function test_onlyContractSignersAllowlisterModifier_success() public {
