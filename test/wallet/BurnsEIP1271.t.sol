@@ -459,6 +459,65 @@ contract GatewayWalletBurnsEIP1271Test is SignatureTestUtils, DeployUtils {
         _executeBurnIntentSet(encodedIntentSet, signature);
     }
 
+    function test_burnIntent_withRevokedContractSigner_succeeds() public {
+        // Create intents with different signers (this should fail)
+        address newValidContractSigner = address(new MockEIP1271Signer(contractOwner));
+
+        // Add available balance to the contract signer
+        deal(address(usdc), depositor, 1000e6);
+        vm.prank(depositor);
+        wallet.depositFor(address(usdc), newValidContractSigner, 1000e6);
+
+        vm.startPrank(allowlister);
+        {
+            wallet.allowlistContractSigner(newValidContractSigner);
+            wallet.disallowContractSigner(newValidContractSigner);
+        }
+        vm.stopPrank();
+
+        BurnIntent memory intent = _createBurnIntent(newValidContractSigner, 1000e6);
+        intent.spec.sourceDepositor = AddressLib._addressToBytes32(newValidContractSigner);
+        bytes memory encodedIntent = BurnIntentLib.encodeBurnIntent(intent);
+
+        // Sign with contract (this matches first intent)
+        bytes memory signature = _signIntentWithEIP1271(encodedIntent, newValidContractSigner);
+        _executeBurn(encodedIntent, signature, 0.5e6);
+    }
+
+    function test_burnIntentSet_withRevokedContractSigner_succeeds() public {
+        // Create intents with different signers (this should fail)
+        address newValidContractSigner = address(new MockEIP1271Signer(contractOwner));
+
+        // Add available balance to the contract signer
+        deal(address(usdc), depositor, 1500e6);
+        vm.prank(depositor);
+        wallet.depositFor(address(usdc), newValidContractSigner, 1500e6);
+
+        vm.startPrank(allowlister);
+        {
+            wallet.allowlistContractSigner(newValidContractSigner);
+            wallet.disallowContractSigner(newValidContractSigner);
+        }
+        vm.stopPrank();
+
+        BurnIntent memory intent1 = _createBurnIntent(newValidContractSigner, 1000e6);
+        BurnIntent memory intent2 = _createBurnIntent(newValidContractSigner, 500e6); // Different signer
+        intent1.spec.sourceDepositor = AddressLib._addressToBytes32(newValidContractSigner);
+        intent2.spec.sourceDepositor = AddressLib._addressToBytes32(newValidContractSigner);
+
+        BurnIntent[] memory intents = new BurnIntent[](2);
+        intents[0] = intent1;
+        intents[1] = intent2;
+
+        BurnIntentSet memory intentSet = BurnIntentSet({intents: intents});
+        bytes memory encodedIntentSet = BurnIntentLib.encodeBurnIntentSet(intentSet);
+
+        // Sign with contract (this matches first intent)
+        bytes memory signature = _signIntentWithEIP1271(encodedIntentSet, newValidContractSigner);
+
+        _executeBurnIntentSet(encodedIntentSet, signature);
+    }
+
     function _executeBurnIntentSet(bytes memory intentSet, bytes memory signature) internal {
         bytes[] memory intentArray = new bytes[](1);
         intentArray[0] = intentSet;
