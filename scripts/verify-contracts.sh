@@ -17,10 +17,11 @@ declare -A networks=(
   [base_sepolia]="staging testnet"
   [avalanche]="mainnet"
   [avalanche_fuji]="staging testnet"
+  [arbitrum]="mainnet"
+  [arbitrum_sepolia]="staging"
   [polygon]="mainnet"
   [unichain]="mainnet"
   [optimism]="mainnet"
-  [arbitrum]="mainnet"
 )
 
 # Map to the names needed for the verification calls
@@ -34,6 +35,7 @@ declare -A verifier_networks=(
   [polygon]="polygon"
   [unichain]="unichain"
   [optimism]="optimism"
+  [arbitrum_sepolia]="arbitrum-sepolia"
   [arbitrum]="arbitrum"
 )
 
