@@ -3,9 +3,9 @@
 chains=(
   local
   ethereum
-  # ethereum_sepolia
+  ethereum_sepolia
   arbitrum
-  # arbitrum_sepolia
+  arbitrum_sepolia
   base
   base_sepolia
 )

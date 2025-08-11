@@ -20,6 +20,19 @@ pragma solidity ^0.8.29;
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable/access/Ownable2StepUpgradeable.sol";
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 
+/// @title Contract Signer Allowlist Status
+///
+/// @notice Represents the possible states of a contract signer's allowlist status.
+enum ContractSignerAllowlistStatus {
+    /// The contract signer has never been allowlisted
+    Unallowlisted,
+    /// The contract signer is allowlisted
+    Allowlisted,
+    /// The contract signer was previously allowlisted, but the allowlist has been revoked. This state is distinct from
+    /// `Unallowlisted` to handle specific scenarios like signed burn intents.
+    Revoked
+}
+
 /// @title ContractSignersAllowlist
 ///
 /// @notice Manages an allowlist of contract addresses that can use EIP-1271 signing for burn intents.
@@ -71,7 +84,8 @@ contract ContractSignersAllowlist is Initializable, Ownable2StepUpgradeable {
     /// @param contractAddr   The contract address to check
     /// @return               `true` if the contract is allowlisted, `false` otherwise
     function isAllowlistedContractSigner(address contractAddr) public view returns (bool) {
-        return ContractSignersAllowlistStorage.get().allowlistMapping[contractAddr];
+        return ContractSignersAllowlistStorage.get().allowlistMapping[contractAddr]
+            == ContractSignerAllowlistStatus.Allowlisted;
     }
 
     /// The address with the `contractSignersAllowlister` role that can modify the allowlist
@@ -87,7 +101,7 @@ contract ContractSignersAllowlist is Initializable, Ownable2StepUpgradeable {
     ///
     /// @param contractAddr   The contract address to be allowlisted
     function allowlistContractSigner(address contractAddr) external onlyContractSignersAllowlister {
-        _setContractSignerAllowlist(contractAddr, true);
+        _setContractSignerAllowlist(contractAddr, ContractSignerAllowlistStatus.Allowlisted);
         emit ContractSignerAllowlisted(contractAddr);
     }
 
@@ -97,7 +111,7 @@ contract ContractSignersAllowlist is Initializable, Ownable2StepUpgradeable {
     ///
     /// @param contractAddr   The contract address to be removed from the allowlist
     function disallowContractSigner(address contractAddr) external onlyContractSignersAllowlister {
-        _setContractSignerAllowlist(contractAddr, false);
+        _setContractSignerAllowlist(contractAddr, ContractSignerAllowlistStatus.Revoked);
         emit ContractSignerDisallowed(contractAddr);
     }
 
@@ -115,12 +129,12 @@ contract ContractSignersAllowlist is Initializable, Ownable2StepUpgradeable {
     /// Sets the allowlist status of a contract address
     ///
     /// @param contractAddr   The contract address to set the allowlist status for
-    /// @param allowlisted    Whether or not the contract should be allowlisted
-    function _setContractSignerAllowlist(address contractAddr, bool allowlisted) internal {
+    /// @param status         The new allowlist status
+    function _setContractSignerAllowlist(address contractAddr, ContractSignerAllowlistStatus status) internal {
         if (contractAddr == address(0)) {
             revert ZeroAddressContractSigner();
         }
-        ContractSignersAllowlistStorage.get().allowlistMapping[contractAddr] = allowlisted;
+        ContractSignersAllowlistStorage.get().allowlistMapping[contractAddr] = status;
     }
 
     /// Sets the address that is allowed to modify the contract signers allowlist
@@ -132,6 +146,20 @@ contract ContractSignersAllowlist is Initializable, Ownable2StepUpgradeable {
         }
         ContractSignersAllowlistStorage.get().allowlister = newAllowlister;
     }
+
+    /// Check if an address has ever been allowlisted for EIP-1271 signing. This includes both currently-valid and
+    /// revoked allowlists.
+    ///
+    /// @param contractAddr   The contract address to check
+    /// @return               `true` if the address has ever been allowlisted, `false` otherwise
+    function _wasEverAllowlistedContractSigner(address contractAddr) internal view returns (bool) {
+        // A contract is always allowlisted for its own balance
+        if (contractAddr == address(0)) return true;
+
+        // Otherwise, check that the stored allowlist status is either `Allowlisted` or `RevokedAllowlist`
+        ContractSignerAllowlistStatus status = ContractSignersAllowlistStorage.get().allowlistMapping[contractAddr];
+        return status != ContractSignerAllowlistStatus.Unallowlisted;
+    }
 }
 
 /// @title ContractSignersAllowlistStorage
@@ -141,7 +169,7 @@ library ContractSignersAllowlistStorage {
     /// @custom:storage-location erc7201:circle.gateway.ContractSignersAllowlist
     struct Data {
         /// Mapping of contract addresses to their allowlist status for EIP-1271 signing
-        mapping(address contractAddr => bool allowlisted) allowlistMapping;
+        mapping(address contractAddr => ContractSignerAllowlistStatus status) allowlistMapping;
         /// The address that is allowed to manage the contract signers allowlist
         address allowlister;
     }
