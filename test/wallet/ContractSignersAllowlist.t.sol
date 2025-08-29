@@ -54,8 +54,14 @@ contract ContractSignersAllowlistTest is Test {
     }
 
     function test_wasEverAllowlistedContractSigner_returnsTrueIfAllowlisted(address contractAddr) public {
+        vm.assume(contractAddr != address(0));
+
+        // Set a non-zero allowlister
+        vm.prank(owner);
+        allowlistContract.updateContractSignersAllowlister(allowlister);
+
         // Allowlist contract
-        vm.prank(allowlistContract.contractSignersAllowlister());
+        vm.prank(allowlister);
         allowlistContract.allowlistContractSigner(contractAddr);
 
         // Verify contract is allowlisted
@@ -65,8 +71,14 @@ contract ContractSignersAllowlistTest is Test {
     function test_wasEverAllowlistedContractSigner_returnsTrueIfAllowlistedThenDisallowed(address contractAddr)
         public
     {
+        vm.assume(contractAddr != address(0));
+
+        // Set a non-zero allowlister
+        vm.prank(owner);
+        allowlistContract.updateContractSignersAllowlister(allowlister);
+
         // Allowlist contract
-        vm.startPrank(allowlistContract.contractSignersAllowlister());
+        vm.startPrank(allowlister);
         {
             allowlistContract.allowlistContractSigner(contractAddr);
             allowlistContract.disallowContractSigner(contractAddr);
