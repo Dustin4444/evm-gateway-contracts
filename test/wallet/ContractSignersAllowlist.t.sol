@@ -48,6 +48,47 @@ contract ContractSignersAllowlistTest is Test {
         allowlistContract.initialize(owner);
     }
 
+    function test_wasEverAllowlistedContractSigner_returnsFalseIfZeroAddress() public view {
+        // Verify zero address is not allowlisted
+        assertFalse(allowlistContract.wasEverAllowlistedContractSigner(address(0)));
+    }
+
+    function test_wasEverAllowlistedContractSigner_returnsTrueIfAllowlisted(address contractAddr) public {
+        vm.assume(contractAddr != address(0));
+
+        // Set a non-zero allowlister
+        vm.prank(owner);
+        allowlistContract.updateContractSignersAllowlister(allowlister);
+
+        // Allowlist contract
+        vm.prank(allowlister);
+        allowlistContract.allowlistContractSigner(contractAddr);
+
+        // Verify contract is allowlisted
+        assertTrue(allowlistContract.wasEverAllowlistedContractSigner(contractAddr));
+    }
+
+    function test_wasEverAllowlistedContractSigner_returnsTrueIfAllowlistedThenDisallowed(address contractAddr)
+        public
+    {
+        vm.assume(contractAddr != address(0));
+
+        // Set a non-zero allowlister
+        vm.prank(owner);
+        allowlistContract.updateContractSignersAllowlister(allowlister);
+
+        // Allowlist contract
+        vm.startPrank(allowlister);
+        {
+            allowlistContract.allowlistContractSigner(contractAddr);
+            allowlistContract.disallowContractSigner(contractAddr);
+        }
+        vm.stopPrank();
+
+        // Verify contract is allowlisted
+        assertTrue(allowlistContract.wasEverAllowlistedContractSigner(contractAddr));
+    }
+
     function test_initialState() public {
         // Verify no allowlister is set initially
         vm.expectRevert(

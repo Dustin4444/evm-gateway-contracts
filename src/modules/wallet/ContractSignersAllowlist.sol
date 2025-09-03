@@ -153,10 +153,7 @@ contract ContractSignersAllowlist is Initializable, Ownable2StepUpgradeable {
     /// @param contractAddr   The contract address to check
     /// @return               `true` if the address has ever been allowlisted, `false` otherwise
     function _wasEverAllowlistedContractSigner(address contractAddr) internal view returns (bool) {
-        // A contract is always allowlisted for its own balance
-        if (contractAddr == address(0)) return true;
-
-        // Otherwise, check that the stored allowlist status is either `Allowlisted` or `RevokedAllowlist`
+        // Check that the stored allowlist status is either `Allowlisted` or `RevokedAllowlist`
         ContractSignerAllowlistStatus status = ContractSignersAllowlistStorage.get().allowlistMapping[contractAddr];
         return status != ContractSignerAllowlistStatus.Unallowlisted;
     }
