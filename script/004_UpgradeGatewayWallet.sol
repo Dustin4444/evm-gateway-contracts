@@ -39,49 +39,45 @@ contract UpgradeGatewayWallet is BaseBytecodeDeployScript {
     function run() public returns (address newImplAddress) {
         // Get the proxy address from environment variable
         address gatewayWalletProxy = vm.envAddress("GATEWAYMINTER_WALLET_ADDRESS");
-        
+
         // Get the owner address who can perform upgrades
         address gatewayWalletOwner = vm.envAddress("GATEWAYWALLET_OWNER_ADDRESS");
-        
+
         // Get environment configuration
         EnvConfig memory config = envSelector.getEnvironmentConfig();
-        
+
         // Use environment-specific values
         address deployer = config.deployerAddress;
         address factory = config.factoryAddress;
-        
+
         // Use the same salt as the original deployment
         // CREATE2 will automatically generate a different address because the bytecode has changed
         bytes32 newWalletImplSalt = config.walletSalt;
-        
+
         // First, validate that the owner is properly configured
         require(gatewayWalletOwner != address(0), "GATEWAYWALLET_OWNER_ADDRESS not set");
-        
+
         // Step 1: Deploy new GatewayWallet implementation (using deployer)
         vm.startBroadcast(deployer);
         newImplAddress = deploy(factory, "GatewayWallet.json", newWalletImplSalt, hex"");
         console.log("New GatewayWallet implementation address", newImplAddress);
         vm.stopBroadcast();
-        
+
         // Step 2: Upgrade the proxy to the new implementation (using owner)
         vm.startBroadcast(gatewayWalletOwner);
-        
+
         // In OpenZeppelin v5, we must use upgradeToAndCall even for simple upgrades
         // Pass empty data since we don't need to call any initialization function
-        bytes memory upgradeCallData = abi.encodeWithSignature(
-            "upgradeToAndCall(address,bytes)",
-            newImplAddress,
-            hex""
-        );
-        
+        bytes memory upgradeCallData = abi.encodeWithSignature("upgradeToAndCall(address,bytes)", newImplAddress, hex"");
+
         // Execute the upgrade through the proxy
         (bool success, bytes memory returnData) = gatewayWalletProxy.call(upgradeCallData);
         require(success, string(abi.encodePacked("Upgrade failed: ", returnData)));
-        
+
         console.log("Successfully upgraded GatewayWallet proxy to new implementation");
         console.log("Proxy address:", gatewayWalletProxy);
         console.log("New implementation address:", newImplAddress);
-        
+
         vm.stopBroadcast();
     }
 }
