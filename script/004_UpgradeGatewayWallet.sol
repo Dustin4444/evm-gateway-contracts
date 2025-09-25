@@ -36,6 +36,7 @@ contract UpgradeGatewayWallet is BaseBytecodeDeployScript {
     /// @dev Upgrade process:
     ///      1. Deploy new GatewayWallet implementation
     ///      2. Call upgradeToAndCall on the proxy to upgrade to new implementation
+    ///      3. Update contract signers allowlister
     function run() public returns (address newImplAddress) {
         // Get the proxy address from environment variable
         address gatewayWalletProxy = vm.envAddress("GATEWAYMINTER_WALLET_ADDRESS");
@@ -78,6 +79,24 @@ contract UpgradeGatewayWallet is BaseBytecodeDeployScript {
         console.log("Proxy address:", gatewayWalletProxy);
         console.log("New implementation address:", newImplAddress);
 
+        vm.stopBroadcast();
+
+        // Step 3: Update contract signers allowlister
+        address contractSignersAllowlister = vm.envAddress("GATEWAYWALLET_CONTRACT_SIGNERS_ALLOWLISTER_ADDRESS");
+        require(contractSignersAllowlister != address(0), "GATEWAYWALLET_CONTRACT_SIGNERS_ALLOWLISTER_ADDRESS not set");
+        
+        console.log("\nUpdating contract signers allowlister...");
+        console.log("New allowlister address:", contractSignersAllowlister);
+        
+        // Start broadcast for the allowlister update
+        vm.startBroadcast(gatewayWalletOwner);
+        
+        bytes memory updateAllowlisterCallData = abi.encodeWithSignature("updateContractSignersAllowlister(address)", contractSignersAllowlister);
+        (bool updateSuccess, bytes memory updateReturnData) = gatewayWalletProxy.call(updateAllowlisterCallData);
+        require(updateSuccess, string(abi.encodePacked("updateContractSignersAllowlister failed: ", updateReturnData)));
+        
+        console.log("Successfully updated contract signers allowlister");
+        
         vm.stopBroadcast();
     }
 }

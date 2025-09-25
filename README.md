@@ -101,8 +101,9 @@ This command validates deployed contract bytecode matches expected bytecode and 
 To upgrade an existing deployed GatewayWallet to the latest implementation:
 
 1. Add the proxy address of the deployed GatewayWallet to your `.env` file as `GATEWAYMINTER_WALLET_ADDRESS`
-2. Compile the contracts using `yarn artifacts`
-3. Run the upgrade script:
+2. Set `GATEWAYWALLET_CONTRACT_SIGNERS_ALLOWLISTER_ADDRESS` in your `.env` file
+3. Compile the contracts using `yarn artifacts`
+4. Run the upgrade script:
 
 ```bash
 # Generate upgrade transaction (dry run)
@@ -116,17 +117,21 @@ ENV=$ENV forge script script/004_UpgradeGatewayWallet.sol:UpgradeGatewayWallet -
 - `RPC_URL`: The rpc url for the targeted blockchain.
 - `GATEWAYMINTER_WALLET_ADDRESS`: Must be set in your environment to the proxy address you want to upgrade.
 - `GATEWAYWALLET_OWNER_ADDRESS`: Must be set to the current owner of the GatewayWallet proxy (required for the upgrade call).
+- `GATEWAYWALLET_CONTRACT_SIGNERS_ALLOWLISTER_ADDRESS`: Must be set to the contract signers allowlister address.
 
 The script will:
 - Deploy a new GatewayWallet implementation using CREATE2 with the deployer address (same salt, different address due to updated bytecode)
 - Call `upgradeTo` on the proxy using the owner address to point to the new implementation
+- Update the contract signers allowlister to the configured address
 - Output the new implementation address for verification
 
 The generated transaction data will be available in the `broadcast/` directory and can be used for signing.
 
+When running without `--broadcast`, the script will generate unsigned transactions for each step in the `broadcast/` directory. These can be signed offline or with a multi-sig wallet.
+
 **Note**: The script requires two different signers:
 - The **deployer** (from environment config) deploys the new implementation contract via CREATE2
-- The **owner** (from `GATEWAYWALLET_OWNER_ADDRESS`) executes the upgrade on the proxy
+- The **owner** (from `GATEWAYWALLET_OWNER_ADDRESS`) executes the upgrade on the proxy and any administrative functions like `updateContractSignersAllowlister`
 
 ### How to Update Deployment Scripts
 
