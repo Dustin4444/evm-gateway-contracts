@@ -84,19 +84,20 @@ contract UpgradeGatewayWallet is BaseBytecodeDeployScript {
         // Step 3: Update contract signers allowlister
         address contractSignersAllowlister = vm.envAddress("GATEWAYWALLET_CONTRACT_SIGNERS_ALLOWLISTER_ADDRESS");
         require(contractSignersAllowlister != address(0), "GATEWAYWALLET_CONTRACT_SIGNERS_ALLOWLISTER_ADDRESS not set");
-        
+
         console.log("\nUpdating contract signers allowlister...");
         console.log("New allowlister address:", contractSignersAllowlister);
-        
+
         // Start broadcast for the allowlister update
         vm.startBroadcast(gatewayWalletOwner);
-        
-        bytes memory updateAllowlisterCallData = abi.encodeWithSignature("updateContractSignersAllowlister(address)", contractSignersAllowlister);
+
+        bytes memory updateAllowlisterCallData =
+            abi.encodeWithSignature("updateContractSignersAllowlister(address)", contractSignersAllowlister);
         (bool updateSuccess, bytes memory updateReturnData) = gatewayWalletProxy.call(updateAllowlisterCallData);
         require(updateSuccess, string(abi.encodePacked("updateContractSignersAllowlister failed: ", updateReturnData)));
-        
+
         console.log("Successfully updated contract signers allowlister");
-        
+
         vm.stopBroadcast();
     }
 }
