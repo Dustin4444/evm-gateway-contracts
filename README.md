@@ -20,7 +20,7 @@ These are the contracts that support the Circle Gateway product. See the contrac
 The deployment steps are:
 
 1. Deploy the `UpgradablePlaceholder` implementation
-2. Deploy the actual implementation (e.g. `GatewayMinter`)
+2. Deploy the actual implementation (e.g. `GatewayMinter`, `GatewayWallet`)
 3. Deploy the ERC1967Proxy and setup the proxy:
    1. Deploy the ERC1967 Proxy, set the implementation to `UpgradablePlaceholder` and initialize the owner to Create2Factory address.
    2. In the same transcation, upgrade the implementation to actual implementation and initialize the implementation properly.
@@ -28,6 +28,8 @@ The deployment steps are:
 The reason of setting owner of `UpgradablePlaceholder` to Create2Factory address is that since the owner is part of the address computation, we want to use Create2Factory to avoid managing an extra EOA key.
 
 Since the owner of `UpgradablePlaceholder` is Create2Factory and only the owner can perform `upgradeToAndCall`, we decided to use `Create2Factory.deployAndMultiCall` to upgrade to actual implementation in the proxy deployment call.
+
+**Note**: The deployment scripts always deploy the latest compiled version of the contracts. Make sure to compile your contracts with `yarn artifacts` before deployment to ensure you're deploying the most up-to-date implementation.
 
 ### Prerequisites
 
@@ -74,7 +76,7 @@ Run the following command to generate deployment transactions for `GatewayWallet
 
 ```bash
 ENV=$ENV forge script script/001_DeployGatewayWallet.sol --rpc-url $RPC_URL -vvvv --slow --force
-ENV=$ENV forge script script/001_DeployGatewayMinter.sol --rpc-url $RPC_URL -vvvv --slow --force
+ENV=$ENV forge script script/002_DeployGatewayMinter.sol --rpc-url $RPC_URL -vvvv --slow --force
 ```
 
 - `ENV`: Use `LOCAL` for local deployment. Or choose from `TESTNET_STAGING`, `TESTNET_PROD`, and `MAINNET_PROD`.
@@ -91,6 +93,45 @@ forge script script/003_DeployedContractValidation.s.sol --rpc-url $RPC_URL -vvv
 ```
 
 This command validates deployed contract bytecode matches expected bytecode and contract state matches expected values.
+
+## Upgrading Contracts
+
+### Upgrading GatewayWallet
+
+To upgrade an existing deployed GatewayWallet to the latest implementation:
+
+1. Add the proxy address of the deployed GatewayWallet to your `.env` file as `GATEWAYMINTER_WALLET_ADDRESS`
+2. Set `GATEWAYWALLET_CONTRACT_SIGNERS_ALLOWLISTER_ADDRESS` in your `.env` file
+3. Compile the contracts using `yarn artifacts`
+4. Run the upgrade script:
+
+```bash
+# Generate upgrade transaction (dry run)
+ENV=$ENV forge script script/004_UpgradeGatewayWallet.sol:UpgradeGatewayWallet --rpc-url $RPC_URL -vvvv --slow --force
+
+# Execute upgrade (broadcast mode)
+ENV=$ENV forge script script/004_UpgradeGatewayWallet.sol:UpgradeGatewayWallet --rpc-url $RPC_URL -vvvv --slow --force --broadcast
+```
+
+- `ENV`: Use `LOCAL` for local deployment. Or choose from `TESTNET_STAGING`, `TESTNET_PROD`, and `MAINNET_PROD`.
+- `RPC_URL`: The rpc url for the targeted blockchain.
+- `GATEWAYMINTER_WALLET_ADDRESS`: Must be set in your environment to the proxy address you want to upgrade.
+- `GATEWAYWALLET_OWNER_ADDRESS`: Must be set to the current owner of the GatewayWallet proxy (required for the upgrade call).
+- `GATEWAYWALLET_CONTRACT_SIGNERS_ALLOWLISTER_ADDRESS`: Must be set to the contract signers allowlister address.
+
+The script will:
+- Deploy a new GatewayWallet implementation using CREATE2 with the deployer address (same salt, different address due to updated bytecode)
+- Call `upgradeTo` on the proxy using the owner address to point to the new implementation
+- Update the contract signers allowlister to the configured address
+- Output the new implementation address for verification
+
+The generated transaction data will be available in the `broadcast/` directory and can be used for signing.
+
+When running without `--broadcast`, the script will generate unsigned transactions for each step in the `broadcast/` directory. These can be signed offline or with a multi-sig wallet.
+
+**Note**: The script requires two different signers:
+- The **deployer** (from environment config) deploys the new implementation contract via CREATE2
+- The **owner** (from `GATEWAYWALLET_OWNER_ADDRESS`) executes the upgrade on the proxy and any administrative functions like `updateContractSignersAllowlister`
 
 ### How to Update Deployment Scripts
 
@@ -122,7 +163,7 @@ We have chosen the following prefixes for our top-level contracts:
 | Production | Testnet | 0x0077777 | 0x0022222 | Add zero byte to mainnet addresses |
 | Staging | Testnet | 0x5577777 | 0x5522222 | 5 = "S" for Staging |
 
-To find and verify salts for the Wallet and Minter contracts, correctly set the `ENV` and `RPC_URL` environment variables (and possible `LOCAL_CREATE2_FACTORY_ADDRESS` depending on your environment). Use any values for all of the other variables, as they do not matter here.
+To find and verify salts for the Wallet and Minter contracts, correctly set the `ENV` and `RPC_URL` environment variables (and possibly `LOCAL_CREATE2_FACTORY_ADDRESS` depending on your environment). Use any values for all of the other variables, as they do not matter here.
 
 Simulate the deployments by running the below commands and note down the values initCodeHash from the logs of each command
 1. `ENV=$ENV forge script script/001_DeployGatewayWallet.sol --rpc-url $RPC_URL -vv`
