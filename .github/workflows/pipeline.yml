@@ -1,9 +1,9 @@
 name: pipeline
 on:
   push:
-    branches: [master, cub-support]
+    branches: [master]
   pull_request:
-    branches: [master, cub-support]
+    branches: [master]
   merge_group:
     types: [checks_requested]
 
