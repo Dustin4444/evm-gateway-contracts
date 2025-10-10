@@ -8,7 +8,6 @@ declare -A contract_addresses=(
   [testnet]="0x0077777d7EBA4688BDeF3E311b846F25870A19B9 0x0022222ABE238Cc2C7Bb1f21003F0a260052475B"
   [mainnet]="0x77777777Dcc4d5A8B6E418Fd04D8997ef11000eE 0x2222222d7164433c4C09B0b0D809a9b52C04C205"
 )
-
 # For each network, list the environments that are deployed
 declare -A networks=(
   [ethereum]="mainnet"
@@ -22,6 +21,10 @@ declare -A networks=(
   [polygon]="mainnet"
   [unichain]="mainnet"
   [optimism]="mainnet"
+  [hyperevm]="mainnet"
+  [sonic]="mainnet"
+  [world]="mainnet"
+  [world_sepolia]="staging testnet"
 )
 
 # Map to the names needed for the verification calls
@@ -37,6 +40,11 @@ declare -A verifier_networks=(
   [optimism]="optimism"
   [arbitrum_sepolia]="arbitrum-sepolia"
   [arbitrum]="arbitrum"
+  [hyperevm]="hyperevm"
+  [sei]="sei"
+  [sonic]="sonic"
+  [world]="world"
+  [world_sepolia]="world-sepolia"
 )
 
 if [ -z "${ETHERSCAN_KEY}" ]; then
