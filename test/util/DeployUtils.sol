@@ -87,7 +87,8 @@ abstract contract DeployUtils is CommonBase {
                 domain, // domain
                 0, // withdrawal delay
                 owner, // burn signer
-                owner // fee recipient
+                owner, // fee recipient
+                owner // contract signers allowlister
             )
         );
     }

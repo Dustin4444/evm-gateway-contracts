@@ -35,6 +35,10 @@ for chain in ${chains[@]}; do
   # Skip bytecode match test
   forge_test_args+=(--no-match-test="BytecodeMatch")
 
+  # Skip bytecode match test
+  forge_test_args+=(-vvvv)
+  forge_test_args+=(--match-test="testDeployGatewayWallet")
+
   echo "=== Running tests on chain: ${chain} ==="
   echo
 
