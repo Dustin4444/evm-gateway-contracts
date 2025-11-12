@@ -46,17 +46,20 @@ contract DeployGatewayWallet is BaseBytecodeDeployScript {
         uint256 withdrawalDelay = vm.envUint("GATEWAYWALLET_WITHDRAWAL_DELAY");
         address gatewayWalletBurnSigner = vm.envAddress("GATEWAYWALLET_BURNSIGNER_ADDRESS");
         address gatewayWalletFeeRecipient = vm.envAddress("GATEWAYWALLET_FEERECIPIENT_ADDRESS");
+        address gatewayWalletContractSignersAllowlister =
+            vm.envAddress("GATEWAYWALLET_CONTRACT_SIGNERS_ALLOWLISTER_ADDRESS");
 
         // Encode initialization call with all parameters
         return abi.encodeWithSignature(
-            "initialize(address,address,address[],uint32,uint256,address,address)",
+            "initialize(address,address,address[],uint32,uint256,address,address,address)",
             gatewayWalletPauser,
             gatewayWalletDenylister,
             supportedTokens,
             domain,
             withdrawalDelay,
             gatewayWalletBurnSigner,
-            gatewayWalletFeeRecipient
+            gatewayWalletFeeRecipient,
+            gatewayWalletContractSignersAllowlister
         );
     }
 

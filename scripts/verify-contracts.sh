@@ -6,25 +6,45 @@ set -e
 declare -A contract_addresses=(
   [staging]="0x557777735b1Dd18194F1b84256be2A3CDee6CB6F 0x552222279206Cb0434128e0caE4558a25779c79F"
   [testnet]="0x0077777d7EBA4688BDeF3E311b846F25870A19B9 0x0022222ABE238Cc2C7Bb1f21003F0a260052475B"
-  # [mainnet]="0x77777777Dcc4d5A8B6E418Fd04D8997ef11000eE 0x2222222d7164433c4C09B0b0D809a9b52C04C205"
+  [mainnet]="0x77777777Dcc4d5A8B6E418Fd04D8997ef11000eE 0x2222222d7164433c4C09B0b0D809a9b52C04C205"
 )
-
 # For each network, list the environments that are deployed
 declare -A networks=(
-  # [ethereum]="mainnet"
+  [ethereum]="mainnet"
   [ethereum_sepolia]="staging testnet"
-  # [base]="mainnet"
+  [base]="mainnet"
   [base_sepolia]="staging testnet"
-  # [avalanche]="mainnet"
+  [avalanche]="mainnet"
   [avalanche_fuji]="staging testnet"
+  [arbitrum]="mainnet"
+  [arbitrum_sepolia]="staging"
+  [polygon]="mainnet"
+  [unichain]="mainnet"
+  [optimism]="mainnet"
+  [hyperevm]="mainnet"
+  [sonic]="mainnet"
+  [world]="mainnet"
+  [world_sepolia]="staging testnet"
 )
 
 # Map to the names needed for the verification calls
 declare -A verifier_networks=(
   [ethereum]="mainnet"
   [ethereum_sepolia]="sepolia"
+  [base]="base"
   [base_sepolia]="base-sepolia"
+  [avalanche]="avalanche"
   [avalanche_fuji]="fuji"
+  [polygon]="polygon"
+  [unichain]="unichain"
+  [optimism]="optimism"
+  [arbitrum_sepolia]="arbitrum-sepolia"
+  [arbitrum]="arbitrum"
+  [hyperevm]="hyperevm"
+  [sei]="sei"
+  [sonic]="sonic"
+  [world]="world"
+  [world_sepolia]="world-sepolia"
 )
 
 if [ -z "${ETHERSCAN_KEY}" ]; then

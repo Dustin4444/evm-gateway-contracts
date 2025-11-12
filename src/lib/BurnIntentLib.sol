@@ -18,6 +18,7 @@
 pragma solidity ^0.8.29;
 
 import {TypedMemView} from "@memview-sol/TypedMemView.sol";
+import {AddressLib} from "src/lib/AddressLib.sol";
 import {
     BurnIntent,
     BurnIntentSet,
@@ -247,6 +248,23 @@ library BurnIntentLib {
         c.done = (numIntents == 0); // If the set is empty, the cursor is immediately done
     }
 
+    /// Gets the `TypedMemView` reference to the current element without advancing the cursor
+    ///
+    /// @dev Does not modify the cursor's internal state. Reverts with `CursorOutOfBounds` if called
+    ///      when no elements are remaining.
+    ///
+    /// @param c      The `Cursor` struct
+    /// @return ref   The element the cursor is currently pointing at
+    function current(Cursor memory c) internal pure returns (bytes29) {
+        if (c.done) {
+            revert TransferSpecLib.CursorOutOfBounds();
+        }
+        uint32 currentSpecLength =
+            uint32(c.memView.indexUint(c.offset + BURN_INTENT_TRANSFER_SPEC_LENGTH_OFFSET, UINT32_BYTES));
+        uint256 currentIntentTotalLength = BURN_INTENT_TRANSFER_SPEC_OFFSET + currentSpecLength;
+        return c.memView.slice(c.offset, currentIntentTotalLength, TransferSpecLib._toMemViewType(BURN_INTENT_MAGIC));
+    }
+
     /// Gets the `TypedMemView` reference to the next element and advances the cursor
     ///
     /// @dev Updates the cursor's internal state (`offset`, `index`, `done`). Reverts with `CursorOutOfBounds` if called
@@ -255,17 +273,9 @@ library BurnIntentLib {
     /// @param c      The `Cursor` struct
     /// @return ref   The element the cursor was pointing at immediately before this function was called
     function next(Cursor memory c) internal pure returns (bytes29 ref) {
-        if (c.done) {
-            revert TransferSpecLib.CursorOutOfBounds();
-        }
+        ref = current(c);
 
-        uint32 currentSpecLength =
-            uint32(c.memView.indexUint(c.offset + BURN_INTENT_TRANSFER_SPEC_LENGTH_OFFSET, UINT32_BYTES));
-        uint256 currentIntentTotalLength = BURN_INTENT_TRANSFER_SPEC_OFFSET + currentSpecLength;
-
-        ref = c.memView.slice(c.offset, currentIntentTotalLength, TransferSpecLib._toMemViewType(BURN_INTENT_MAGIC));
-
-        c.offset += currentIntentTotalLength;
+        c.offset += ref.len();
         c.index++;
 
         if (c.index >= c.numElements) {
@@ -459,5 +469,16 @@ library BurnIntentLib {
         }
 
         return keccak256(abi.encodePacked(BURN_INTENT_SET_TYPEHASH, keccak256(abi.encodePacked(intentHashes))));
+    }
+
+    /// Helper function to extract source signer from cursor without advancing it
+    ///
+    /// @dev Gets the current intent from cursor position and extracts its source signer
+    ///
+    /// @param c   The cursor positioned at the intent to extract from
+    /// @return    The source signer address
+    function _getSourceSignerFromCursor(Cursor memory c) internal pure returns (address) {
+        bytes32 signerBytes = TransferSpecLib.getSourceSigner(getTransferSpec(current(c)));
+        return AddressLib._bytes32ToAddress(signerBytes);
     }
 }
