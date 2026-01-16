@@ -20,6 +20,7 @@ pragma solidity ^0.8.29;
 import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {MessageHashUtils} from "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
+import {GatewayCommon} from "src/GatewayCommon.sol";
 import {GatewayWallet} from "src/GatewayWallet.sol";
 import {AddressLib} from "src/lib/AddressLib.sol";
 import {BurnIntentLib} from "src/lib/BurnIntentLib.sol";
@@ -780,7 +781,7 @@ contract GatewayWalletBurnsTest is SignatureTestUtils, DeployUtils {
         _assertBalances("Initial State", underFundedDepositor, feeRecipient, initialExpectedBalances);
 
         vm.expectEmit(true, true, true, true);
-        emit Burns.InsufficientBalance(
+        emit GatewayCommon.InsufficientBalance(
             address(usdc),
             underFundedDepositor,
             intent.spec.value + fee, // Total needed: $2500 + $0.50 = $2500.50
@@ -940,7 +941,7 @@ contract GatewayWalletBurnsTest is SignatureTestUtils, DeployUtils {
 
         _expectBurnEvent(testData.eventParams1); // Event for successful intent1
         vm.expectEmit(true, true, true, true);
-        emit Burns.InsufficientBalance(
+        emit GatewayCommon.InsufficientBalance(
             address(usdc),
             testData.depositorAddr,
             testData.insufficientEventValueNeeded,
@@ -995,7 +996,7 @@ contract GatewayWalletBurnsTest is SignatureTestUtils, DeployUtils {
         _assertBalances("Initial State", underFundedDepositor, feeRecipient, initialExpectedBalances);
 
         vm.expectEmit(true, true, true, true);
-        emit Burns.InsufficientBalance(
+        emit GatewayCommon.InsufficientBalance(
             address(usdc),
             underFundedDepositor,
             intent.spec.value + fee, // Total needed: $1250 + $0.50 = $1250.50
@@ -1157,7 +1158,7 @@ contract GatewayWalletBurnsTest is SignatureTestUtils, DeployUtils {
 
         _expectBurnEvent(testData.eventParams1); // Event for successful intent1
         vm.expectEmit(true, true, true, true);
-        emit Burns.InsufficientBalance(
+        emit GatewayCommon.InsufficientBalance(
             address(usdc),
             testData.depositorAddr,
             testData.insufficientEventValueNeeded,

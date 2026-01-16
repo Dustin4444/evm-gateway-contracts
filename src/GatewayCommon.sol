@@ -39,6 +39,22 @@ contract GatewayCommon is
     TransferSpecHashes,
     Domain
 {
+    /// Emitted when the depositor does not have a sufficient balance to cover what needs to be burned or spent. This should
+    /// never happen under normal circumstances.
+    ///
+    /// @param token                The token being burned
+    /// @param depositor            The depositor who owns the balance
+    /// @param value                The amount that needed to be burned
+    /// @param availableBalance     The amount that was present in the `available` balance
+    /// @param withdrawingBalance   The amount that was present in the `withdrawing` balance
+    event InsufficientBalance(
+        address indexed token,
+        address indexed depositor,
+        uint256 value,
+        uint256 availableBalance,
+        uint256 withdrawingBalance
+    );
+
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
         // Ensure that the implementation contract cannot be initialized, only the proxy

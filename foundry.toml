@@ -11,6 +11,7 @@ optimizer = true
 optimizer_runs = 150
 gas_reports = ["GatewayWallet", "GatewayMinter", "UpgradeablePlaceholder"]
 fs_permissions = [{ access = "read", path = "./script/compiled-contract-artifacts"}]
+via_ir = true
 
 [rpc_endpoints]
 ethereum = "https://ethereum-rpc.publicnode.com"
