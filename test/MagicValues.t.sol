@@ -33,6 +33,7 @@ import {TokenSupportStorage} from "src/modules/common/TokenSupport.sol";
 import {TransferSpecHashesStorage} from "src/modules/common/TransferSpecHashes.sol";
 import {MintsStorage} from "src/modules/minter/Mints.sol";
 import {BalancesStorage} from "src/modules/wallet/Balances.sol";
+import {BatchesStorage} from "src/modules/wallet/Batches.sol";
 import {BurnsStorage} from "src/modules/wallet/Burns.sol";
 import {ContractSignersAllowlistStorage} from "src/modules/wallet/ContractSignersAllowlist.sol";
 import {DelegationStorage} from "src/modules/wallet/Delegation.sol";
@@ -104,6 +105,13 @@ contract TestMagicValues is Test {
         assertEq(
             BalancesStorage.SLOT,
             keccak256(abi.encode(uint256(keccak256(bytes("circle.gateway.Balances"))) - 1)) & ~bytes32(uint256(0xff))
+        );
+    }
+
+    function test_BatchesStorage_slot() external pure {
+        assertEq(
+            BatchesStorage.SLOT,
+            keccak256(abi.encode(uint256(keccak256(bytes("circle.gateway.Batches"))) - 1)) & ~bytes32(uint256(0xff))
         );
     }
 

@@ -68,22 +68,6 @@ contract Burns is GatewayCommon, Balances, Delegation, ContractSignersAllowlist,
         uint256 fromWithdrawing
     );
 
-    /// Emitted when the depositor does not have a sufficient balance to cover what needs to be burned. This should
-    /// never happen under normal circumstances.
-    ///
-    /// @param token                The token being burned
-    /// @param depositor            The depositor who owns the balance
-    /// @param value                The amount that needed to be burned
-    /// @param availableBalance     The amount that was present in the `available` balance
-    /// @param withdrawingBalance   The amount that was present in the `withdrawing` balance
-    event InsufficientBalance(
-        address indexed token,
-        address indexed depositor,
-        uint256 value,
-        uint256 availableBalance,
-        uint256 withdrawingBalance
-    );
-
     /// Emitted when a burn signer is added
     ///
     /// @param signer   The burn signer address that was added

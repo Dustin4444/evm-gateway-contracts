@@ -18,86 +18,228 @@
 pragma solidity ^0.8.29;
 
 import {console} from "forge-std/console.sol";
-import {EnvSelector, EnvConfig} from "script/000_Constants.sol";
-import {BaseBytecodeDeployScript} from "script/BaseBytecodeDeployScript.sol";
+import {Script} from "forge-std/Script.sol";
+
+import {GatewayWallet} from "src/GatewayWallet.sol";
 
 /// @title UpgradeGatewayWallet
-/// @notice Upgrade script for GatewayWallet implementation
-/// @dev Deploys a new implementation and upgrades the proxy to use it
-contract UpgradeGatewayWallet is BaseBytecodeDeployScript {
-    /// @dev Environment selector for multi-environment deployment
-    EnvSelector private envSelector;
-
-    constructor() {
-        envSelector = new EnvSelector();
-    }
-
+/// @notice Generic upgrade script for GatewayWallet - always upgrades to the latest implementation
+/// @dev This script upgrades an existing GatewayWallet proxy to the latest implementation.
+///      Uses bytecode deployment from compiled artifacts to ensure consistent bytecode across chains.
+///
+///      Upgrade process:
+///      1. Deploy new GatewayWallet implementation from compiled bytecode
+///      2. Call upgradeToAndCall on the proxy to upgrade to new implementation
+///      3. (Optional) Update contract signers allowlister if GATEWAYWALLET_CONTRACT_SIGNERS_ALLOWLISTER_ADDRESS is set
+///      4. (Optional) Add batch signer if GATEWAYWALLET_BATCHSIGNER_ADDRESS is set
+///      5. Validate deployed state
+///
+///      Required environment variables:
+///      - GATEWAYMINTER_WALLET_ADDRESS: The proxy address to upgrade
+///      - GATEWAYWALLET_OWNER_ADDRESS: The owner who can upgrade and set roles
+///      - GATEWAYWALLET_DEPLOYER_ADDRESS: The address that deploys the new implementation
+///
+///      Optional environment variables (set if needed):
+///      - GATEWAYWALLET_CONTRACT_SIGNERS_ALLOWLISTER_ADDRESS: Address for contract signers allowlister role
+///      - GATEWAYWALLET_BATCHSIGNER_ADDRESS: Address to add as batch signer
+///
+///      Usage:
+///      # Dry run (simulation)
+///      forge script script/004_UpgradeGatewayWallet.sol --rpc-url $RPC_URL -vvvv
+///
+///      # Broadcast to network
+///      forge script script/004_UpgradeGatewayWallet.sol --rpc-url $RPC_URL --broadcast -vvvv \
+///        --account deployer --account owner
+contract UpgradeGatewayWallet is Script {
     /// @notice Main upgrade function that deploys new implementation and upgrades the proxy
-    /// @dev Upgrade process:
-    ///      1. Deploy new GatewayWallet implementation
-    ///      2. Call upgradeToAndCall on the proxy to upgrade to new implementation
-    ///      3. Update contract signers allowlister
+    /// @return newImplAddress The address of the newly deployed implementation
     function run() public returns (address newImplAddress) {
-        // Get the proxy address from environment variable
+        // Required environment variables
         address gatewayWalletProxy = vm.envAddress("GATEWAYMINTER_WALLET_ADDRESS");
-
-        // Get the owner address who can perform upgrades
         address gatewayWalletOwner = vm.envAddress("GATEWAYWALLET_OWNER_ADDRESS");
+        address deployer = vm.envAddress("GATEWAYWALLET_DEPLOYER_ADDRESS");
 
-        // Get environment configuration
-        EnvConfig memory config = envSelector.getEnvironmentConfig();
+        // Optional environment variables (default to 0x0 if not set)
+        address contractSignersAllowlister = vm.envOr("GATEWAYWALLET_CONTRACT_SIGNERS_ALLOWLISTER_ADDRESS", address(0));
+        address batchSigner = vm.envOr("GATEWAYWALLET_BATCHSIGNER_ADDRESS", address(0));
 
-        // Use environment-specific values
-        address deployer = config.deployerAddress;
-        address factory = config.factoryAddress;
-
-        // Use the same salt as the original deployment
-        // CREATE2 will automatically generate a different address because the bytecode has changed
-        bytes32 newWalletImplSalt = config.walletSalt;
-
-        // First, validate that the owner is properly configured
+        // Validation
+        require(gatewayWalletProxy != address(0), "GATEWAYMINTER_WALLET_ADDRESS not set");
         require(gatewayWalletOwner != address(0), "GATEWAYWALLET_OWNER_ADDRESS not set");
+        require(deployer != address(0), "GATEWAYWALLET_DEPLOYER_ADDRESS not set");
 
-        // Step 1: Deploy new GatewayWallet implementation (using deployer)
+        console.log("\n=== GatewayWallet Upgrade Configuration ===");
+        console.log("Proxy address:", gatewayWalletProxy);
+        console.log("Owner address:", gatewayWalletOwner);
+        console.log("Deployer address:", deployer);
+        if (contractSignersAllowlister != address(0)) {
+            console.log("Contract Signers Allowlister:", contractSignersAllowlister);
+        } else {
+            console.log("Contract Signers Allowlister: (not set, skipping)");
+        }
+        if (batchSigner != address(0)) {
+            console.log("Batch Signer:", batchSigner);
+        } else {
+            console.log("Batch Signer: (not set, skipping)");
+        }
+
+        // Log current state before upgrade
+        console.log("\n=== Pre-Upgrade State ===");
+        _logCurrentState(gatewayWalletProxy);
+
+        // Step 1: Deploy new GatewayWallet implementation from bytecode
+        console.log("\n=== Step 1: Deploy new implementation ===");
         vm.startBroadcast(deployer);
-        newImplAddress = deploy(factory, "GatewayWallet.json", newWalletImplSalt, hex"");
-        console.log("New GatewayWallet implementation address", newImplAddress);
+        newImplAddress = _deployFromBytecode("GatewayWallet.json");
+        console.log("New GatewayWallet implementation address:", newImplAddress);
         vm.stopBroadcast();
 
-        // Step 2: Upgrade the proxy to the new implementation (using owner)
+        // Step 2: Upgrade the proxy to the new implementation
+        console.log("\n=== Step 2: Upgrade proxy to new implementation ===");
         vm.startBroadcast(gatewayWalletOwner);
 
-        // In OpenZeppelin v5, we must use upgradeToAndCall even for simple upgrades
-        // Pass empty data since we don't need to call any initialization function
         bytes memory upgradeCallData = abi.encodeWithSignature("upgradeToAndCall(address,bytes)", newImplAddress, hex"");
-
-        // Execute the upgrade through the proxy
-        (bool success, bytes memory returnData) = gatewayWalletProxy.call(upgradeCallData);
-        require(success, string(abi.encodePacked("Upgrade failed: ", returnData)));
+        (bool upgradeSuccess, bytes memory upgradeReturnData) = gatewayWalletProxy.call(upgradeCallData);
+        require(upgradeSuccess, string(abi.encodePacked("Upgrade failed: ", upgradeReturnData)));
 
         console.log("Successfully upgraded GatewayWallet proxy to new implementation");
+        vm.stopBroadcast();
+
+        // Step 3: Update contract signers allowlister (optional)
+        if (contractSignersAllowlister != address(0)) {
+            console.log("\n=== Step 3: Update contract signers allowlister ===");
+            vm.startBroadcast(gatewayWalletOwner);
+
+            bytes memory updateAllowlisterCallData =
+                abi.encodeWithSignature("updateContractSignersAllowlister(address)", contractSignersAllowlister);
+            (bool allowlisterSuccess, bytes memory allowlisterReturnData) =
+                gatewayWalletProxy.call(updateAllowlisterCallData);
+            require(
+                allowlisterSuccess,
+                string(abi.encodePacked("updateContractSignersAllowlister failed: ", allowlisterReturnData))
+            );
+
+            console.log("Successfully updated contract signers allowlister to:", contractSignersAllowlister);
+            vm.stopBroadcast();
+        } else {
+            console.log("\n=== Step 3: Update contract signers allowlister (skipped - not set) ===");
+        }
+
+        // Step 4: Add batch signer (optional)
+        if (batchSigner != address(0)) {
+            console.log("\n=== Step 4: Add batch signer ===");
+            vm.startBroadcast(gatewayWalletOwner);
+
+            bytes memory addBatchSignerCallData = abi.encodeWithSignature("addBatchSigner(address)", batchSigner);
+            (bool batchSignerSuccess, bytes memory batchSignerReturnData) =
+                gatewayWalletProxy.call(addBatchSignerCallData);
+            require(batchSignerSuccess, string(abi.encodePacked("addBatchSigner failed: ", batchSignerReturnData)));
+
+            console.log("Successfully added batch signer:", batchSigner);
+            vm.stopBroadcast();
+        } else {
+            console.log("\n=== Step 4: Add batch signer (skipped - not set) ===");
+        }
+
+        // Step 5: Validate deployed state
+        console.log("\n=== Step 5: Validate post-upgrade state ===");
+        _validateUpgrade(
+            gatewayWalletProxy, newImplAddress, gatewayWalletOwner, contractSignersAllowlister, batchSigner
+        );
+
+        // Summary
+        console.log("\n=== GatewayWallet Upgrade Complete ===");
         console.log("Proxy address:", gatewayWalletProxy);
-        console.log("New implementation address:", newImplAddress);
+        console.log("New implementation:", newImplAddress);
+        if (contractSignersAllowlister != address(0)) {
+            console.log("Contract signers allowlister:", contractSignersAllowlister);
+        }
+        if (batchSigner != address(0)) {
+            console.log("Batch signer:", batchSigner);
+        }
+    }
 
-        vm.stopBroadcast();
+    /// @notice Deploys a contract from compiled bytecode artifact using CREATE
+    /// @dev Reads bytecode from JSON artifact and deploys using inline assembly
+    /// @param contractFileName Name of the contract's compiled artifact file (e.g., "GatewayWallet.json")
+    /// @return addr The deployed contract address
+    function _deployFromBytecode(string memory contractFileName) internal returns (address addr) {
+        // Get project root directory and construct path to compiled contract artifact
+        string memory root = vm.projectRoot();
+        string memory path = string.concat(root, "/script/compiled-contract-artifacts/", contractFileName);
+        string memory json = vm.readFile(path);
 
-        // Step 3: Update contract signers allowlister
-        address contractSignersAllowlister = vm.envAddress("GATEWAYWALLET_CONTRACT_SIGNERS_ALLOWLISTER_ADDRESS");
-        require(contractSignersAllowlister != address(0), "GATEWAYWALLET_CONTRACT_SIGNERS_ALLOWLISTER_ADDRESS not set");
+        // Extract bytecode from the compiled contract artifact
+        bytes memory bytecode = abi.decode(vm.parseJson(json, ".bytecode.object"), (bytes));
 
-        console.log("\nUpdating contract signers allowlister...");
-        console.log("New allowlister address:", contractSignersAllowlister);
+        // Deploy using CREATE opcode (not CREATE2)
+        assembly {
+            addr := create(0, add(bytecode, 0x20), mload(bytecode))
+        }
+        require(addr != address(0), "Deployment failed");
+    }
 
-        // Start broadcast for the allowlister update
-        vm.startBroadcast(gatewayWalletOwner);
+    /// @notice Logs the current state of the GatewayWallet before upgrade
+    function _logCurrentState(address proxyAddress) internal view {
+        GatewayWallet wallet = GatewayWallet(proxyAddress);
 
-        bytes memory updateAllowlisterCallData =
-            abi.encodeWithSignature("updateContractSignersAllowlister(address)", contractSignersAllowlister);
-        (bool updateSuccess, bytes memory updateReturnData) = gatewayWalletProxy.call(updateAllowlisterCallData);
-        require(updateSuccess, string(abi.encodePacked("updateContractSignersAllowlister failed: ", updateReturnData)));
+        console.log("Current owner:", wallet.owner());
+        console.log("Current paused:", wallet.paused());
+        console.log("Current domain:", wallet.domain());
 
-        console.log("Successfully updated contract signers allowlister");
+        // Get current implementation from ERC1967 slot
+        bytes32 implSlot = 0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc;
+        bytes32 implBytes = vm.load(proxyAddress, implSlot);
+        address currentImpl = address(uint160(uint256(implBytes)));
+        console.log("Current implementation:", currentImpl);
+    }
 
-        vm.stopBroadcast();
+    /// @notice Validates the GatewayWallet state after upgrade
+    function _validateUpgrade(
+        address proxyAddress,
+        address expectedImpl,
+        address expectedOwner,
+        address expectedAllowlister,
+        address expectedBatchSigner
+    ) internal view {
+        GatewayWallet wallet = GatewayWallet(proxyAddress);
+
+        // Validate implementation was updated
+        bytes32 implSlot = 0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc;
+        bytes32 implBytes = vm.load(proxyAddress, implSlot);
+        address actualImpl = address(uint160(uint256(implBytes)));
+        require(actualImpl == expectedImpl, "Implementation address mismatch");
+        console.log("[OK] Implementation updated to:", actualImpl);
+
+        // Validate owner is unchanged
+        address actualOwner = wallet.owner();
+        require(actualOwner == expectedOwner, "Owner changed unexpectedly");
+        console.log("[OK] Owner unchanged:", actualOwner);
+
+        // Validate contract is not paused
+        bool paused = wallet.paused();
+        require(!paused, "Contract should not be paused after upgrade");
+        console.log("[OK] Contract not paused");
+
+        // Validate contract signers allowlister (if it was set)
+        if (expectedAllowlister != address(0)) {
+            address actualAllowlister = wallet.contractSignersAllowlister();
+            require(actualAllowlister == expectedAllowlister, "Contract signers allowlister mismatch");
+            console.log("[OK] Contract signers allowlister set to:", actualAllowlister);
+        }
+
+        // Validate batch signer was added (if it was set)
+        if (expectedBatchSigner != address(0)) {
+            bool isBatchSigner = wallet.isBatchSigner(expectedBatchSigner);
+            require(isBatchSigner, "Batch signer not registered");
+            console.log("[OK] Batch signer registered:", expectedBatchSigner);
+        }
+
+        // Validate domain is still set
+        uint32 domain = wallet.domain();
+        require(domain != 0, "Domain should be set");
+        console.log("[OK] Domain:", domain);
+
+        console.log("\nAll validations passed!");
     }
 }

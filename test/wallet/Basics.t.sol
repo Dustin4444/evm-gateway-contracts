@@ -21,6 +21,7 @@ import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/Own
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {GatewayWallet} from "src/GatewayWallet.sol";
 import {AddressLib} from "src/lib/AddressLib.sol";
+import {Batches} from "src/modules/wallet/Batches.sol";
 import {Burns} from "src/modules/wallet/Burns.sol";
 import {DeployUtils} from "test/util/DeployUtils.sol";
 import {ForkTestUtils} from "test/util/ForkTestUtils.sol";
@@ -44,7 +45,9 @@ contract GatewayWalletBasicsTest is OwnershipTest, DeployUtils {
     function test_initialize_revertWhenReinitialized() public {
         vm.startPrank(owner);
         vm.expectRevert(abi.encodeWithSelector(Initializable.InvalidInitialization.selector));
-        wallet.initialize(address(0), address(0), new address[](0), uint32(0), 1, address(0), address(0), address(0));
+        wallet.initialize(
+            address(0), address(0), new address[](0), uint32(0), 1, address(0), address(0), address(0), address(0)
+        );
     }
 
     function test_addBurnSigner_revertWhenNotOwner() public {
@@ -177,5 +180,102 @@ contract GatewayWalletBasicsTest is OwnershipTest, DeployUtils {
         wallet.updateFeeRecipient(newFeeRecipient); // second update
 
         assertEq(wallet.feeRecipient(), newFeeRecipient);
+    }
+
+    function test_addBatchSigner_revertWhenNotOwner() public {
+        address randomCaller = makeAddr("random");
+        address newBatchSigner = makeAddr("newBatchSigner");
+
+        vm.startPrank(randomCaller);
+        vm.expectRevert(abi.encodeWithSelector(OwnableUpgradeable.OwnableUnauthorizedAccount.selector, randomCaller));
+        wallet.addBatchSigner(newBatchSigner);
+        vm.stopPrank();
+    }
+
+    function test_removeBatchSigner_revertWhenNotOwner() public {
+        address randomCaller = makeAddr("random");
+        // owner is the initial batch signer
+        address oldBatchSigner = wallet.owner();
+
+        vm.startPrank(randomCaller);
+        vm.expectRevert(abi.encodeWithSelector(OwnableUpgradeable.OwnableUnauthorizedAccount.selector, randomCaller));
+        wallet.removeBatchSigner(oldBatchSigner);
+        vm.stopPrank();
+    }
+
+    function test_addBatchSigner_revertWhenZeroAddress() public {
+        vm.startPrank(owner);
+        vm.expectRevert(AddressLib.InvalidAddress.selector);
+        wallet.addBatchSigner(address(0));
+        vm.stopPrank();
+    }
+
+    function test_removeBatchSigner_revertWhenZeroAddress() public {
+        vm.startPrank(owner);
+        vm.expectRevert(AddressLib.InvalidAddress.selector);
+        wallet.removeBatchSigner(address(0));
+        vm.stopPrank();
+    }
+
+    function test_addBatchSigner_success(address newBatchSigner) public {
+        vm.assume(newBatchSigner != address(0));
+
+        vm.expectEmit(true, false, false, false, address(wallet));
+        emit Batches.BatchSignerAdded(newBatchSigner);
+
+        vm.startPrank(owner);
+        wallet.addBatchSigner(newBatchSigner);
+        vm.stopPrank();
+
+        assertTrue(wallet.isBatchSigner(newBatchSigner));
+    }
+
+    function test_removeBatchSigner_success() public {
+        // Owner is the initial batch signer
+        address oldBatchSigner = wallet.owner();
+
+        vm.expectEmit(true, false, false, false, address(wallet));
+        emit Batches.BatchSignerRemoved(oldBatchSigner);
+
+        vm.startPrank(owner);
+        wallet.removeBatchSigner(oldBatchSigner);
+        vm.stopPrank();
+
+        assertFalse(wallet.isBatchSigner(oldBatchSigner));
+    }
+
+    function test_addBatchSigner_idempotent() public {
+        address newBatchSigner = makeAddr("newBatchSigner");
+
+        vm.startPrank(owner);
+        // First update
+        wallet.addBatchSigner(newBatchSigner);
+        assertTrue(wallet.isBatchSigner(newBatchSigner));
+
+        vm.expectEmit(true, false, false, false, address(wallet));
+        emit Batches.BatchSignerAdded(newBatchSigner);
+        // Second update
+        wallet.addBatchSigner(newBatchSigner);
+        vm.stopPrank();
+
+        assertTrue(wallet.isBatchSigner(newBatchSigner));
+    }
+
+    function test_removeBatchSigner_idempotent() public {
+        // Owner is the initial batch signer
+        address oldBatchSigner = wallet.owner();
+
+        vm.startPrank(owner);
+        // First update
+        wallet.removeBatchSigner(oldBatchSigner);
+        assertFalse(wallet.isBatchSigner(oldBatchSigner));
+
+        vm.expectEmit(true, false, false, false, address(wallet));
+        emit Batches.BatchSignerRemoved(oldBatchSigner);
+        // Second update
+        wallet.removeBatchSigner(oldBatchSigner);
+        vm.stopPrank();
+
+        assertFalse(wallet.isBatchSigner(oldBatchSigner));
     }
 }
