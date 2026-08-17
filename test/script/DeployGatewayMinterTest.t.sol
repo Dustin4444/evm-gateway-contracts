@@ -51,8 +51,8 @@ contract DeployGatewayMinterTest is Test {
     function testDeployGatewayMinter() public {
         // Execute the deployment script and verify the addresses.
         (address placeholderAddress, address implAddress, address proxyAddress) = deployer.run();
-        assertEq(placeholderAddress, 0xD71Ab883fBeAad829Edba1A1e39dEbE57c24C308);
-        assertEq(implAddress, 0xec0Cc9b86c0567E08E53b7B01dBd490fBA786d95);
-        assertEq(proxyAddress, 0xFAdA8589b6730995afb3FB9FdCAe3C8a86995Fff);
+        assertEq(placeholderAddress, 0xe47499CE5cAC6230F0131C908322A8f7Cae2a6e2);
+        assertEq(implAddress, 0x79c748Cd78AfA8e4F77FA82709f014e7f05f04bd);
+        assertEq(proxyAddress, 0x8FF0d0665abfFC91452bbf6CE142E3c9E6b0A0c1);
     }
 }

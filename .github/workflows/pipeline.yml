@@ -12,7 +12,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository code
-        uses: actions/checkout@v3
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
           submodules: 'recursive'
 
@@ -20,12 +20,12 @@ jobs:
         run: sudo apt update && sudo apt install -y jq
 
       - name: Install Node
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
         with:
           node-version: '22.10.0'
 
       - name: Install Foundry
-        uses: foundry-rs/foundry-toolchain@v1
+        uses: foundry-rs/foundry-toolchain@c7450ba673e133f5ee30098b3b54f444d3a2ca2d # v1.8.0
         with:
           version: 'v1.0.0'
 
@@ -48,6 +48,28 @@ jobs:
 
       - name: Check contract sizes
         run: yarn sizes
+
+      - name: Verify proxy addresses
+        run: |
+          echo "Verifying proxy addresses for all environments..."
+          forge script script/ComputeProxyAddress.sol -vvv | tee /tmp/verify.log
+
+          # Count SUCCESS messages - should be 8 (4 environments × 2 proxies each)
+          success_count=$(grep -c "SUCCESS:" /tmp/verify.log || true)
+
+          if [ "$success_count" -ne 8 ]; then
+            echo "❌ Expected 8 SUCCESS messages, got $success_count"
+            echo "Verification failed for one or more environments"
+            exit 1
+          fi
+
+          # Check for any MISMATCH messages
+          if grep -q "MISMATCH:" /tmp/verify.log; then
+            echo "❌ Found address mismatches in verification"
+            exit 1
+          fi
+
+          echo "✅ All 8 proxy addresses verified successfully (TESTNET_TESTING, TESTNET_STAGING, TESTNET_PROD, MAINNET_PROD)"
 
       - name: Run tests
         run: yarn test:all

@@ -31,8 +31,11 @@ import {GatewayWallet} from "src/GatewayWallet.sol";
 ///      1. Deploy new GatewayWallet implementation from compiled bytecode
 ///      2. Call upgradeToAndCall on the proxy to upgrade to new implementation
 ///      3. (Optional) Update contract signers allowlister if GATEWAYWALLET_CONTRACT_SIGNERS_ALLOWLISTER_ADDRESS is set
-///      4. (Optional) Add batch signer if GATEWAYWALLET_BATCHSIGNER_ADDRESS is set
-///      5. Validate deployed state
+///      4. (Optional) Update contract signers disallowlister if GATEWAYWALLET_CONTRACT_SIGNERS_DISALLOWLISTER_ADDRESS
+///         is set
+///      5. (Optional) Add contract signature signer if GATEWAYWALLET_CONTRACT_SIGNATURE_SIGNER_ADDRESS is set
+///      6. (Optional) Add batch signer if GATEWAYWALLET_BATCHSIGNER_ADDRESS is set
+///      7. Validate deployed state
 ///
 ///      Required environment variables:
 ///      - GATEWAYMINTER_WALLET_ADDRESS: The proxy address to upgrade
@@ -41,6 +44,8 @@ import {GatewayWallet} from "src/GatewayWallet.sol";
 ///
 ///      Optional environment variables (set if needed):
 ///      - GATEWAYWALLET_CONTRACT_SIGNERS_ALLOWLISTER_ADDRESS: Address for contract signers allowlister role
+///      - GATEWAYWALLET_CONTRACT_SIGNERS_DISALLOWLISTER_ADDRESS: Address for contract signers disallowlister role
+///      - GATEWAYWALLET_CONTRACT_SIGNATURE_SIGNER_ADDRESS: Address to add as contract signature signer (TEE signer)
 ///      - GATEWAYWALLET_BATCHSIGNER_ADDRESS: Address to add as batch signer
 ///
 ///      Usage:
@@ -61,6 +66,9 @@ contract UpgradeGatewayWallet is Script {
 
         // Optional environment variables (default to 0x0 if not set)
         address contractSignersAllowlister = vm.envOr("GATEWAYWALLET_CONTRACT_SIGNERS_ALLOWLISTER_ADDRESS", address(0));
+        address contractSignersDisallowlister =
+            vm.envOr("GATEWAYWALLET_CONTRACT_SIGNERS_DISALLOWLISTER_ADDRESS", address(0));
+        address contractSignatureSigner = vm.envOr("GATEWAYWALLET_CONTRACT_SIGNATURE_SIGNER_ADDRESS", address(0));
         address batchSigner = vm.envOr("GATEWAYWALLET_BATCHSIGNER_ADDRESS", address(0));
 
         // Validation
@@ -76,6 +84,16 @@ contract UpgradeGatewayWallet is Script {
             console.log("Contract Signers Allowlister:", contractSignersAllowlister);
         } else {
             console.log("Contract Signers Allowlister: (not set, skipping)");
+        }
+        if (contractSignersDisallowlister != address(0)) {
+            console.log("Contract Signers Disallowlister:", contractSignersDisallowlister);
+        } else {
+            console.log("Contract Signers Disallowlister: (not set, skipping)");
+        }
+        if (contractSignatureSigner != address(0)) {
+            console.log("Contract Signature Signer:", contractSignatureSigner);
+        } else {
+            console.log("Contract Signature Signer: (not set, skipping)");
         }
         if (batchSigner != address(0)) {
             console.log("Batch Signer:", batchSigner);
@@ -125,9 +143,49 @@ contract UpgradeGatewayWallet is Script {
             console.log("\n=== Step 3: Update contract signers allowlister (skipped - not set) ===");
         }
 
-        // Step 4: Add batch signer (optional)
+        // Step 4: Update contract signers disallowlister (optional)
+        if (contractSignersDisallowlister != address(0)) {
+            console.log("\n=== Step 4: Update contract signers disallowlister ===");
+            vm.startBroadcast(gatewayWalletOwner);
+
+            bytes memory updateDisallowlisterCallData =
+                abi.encodeWithSignature("updateContractSignersDisallowlister(address)", contractSignersDisallowlister);
+            (bool disallowlisterSuccess, bytes memory disallowlisterReturnData) =
+                gatewayWalletProxy.call(updateDisallowlisterCallData);
+            require(
+                disallowlisterSuccess,
+                string(abi.encodePacked("updateContractSignersDisallowlister failed: ", disallowlisterReturnData))
+            );
+
+            console.log("Successfully updated contract signers disallowlister to:", contractSignersDisallowlister);
+            vm.stopBroadcast();
+        } else {
+            console.log("\n=== Step 4: Update contract signers disallowlister (skipped - not set) ===");
+        }
+
+        // Step 5: Add contract signature signer (optional)
+        if (contractSignatureSigner != address(0)) {
+            console.log("\n=== Step 5: Add contract signature signer ===");
+            vm.startBroadcast(gatewayWalletOwner);
+
+            bytes memory addContractSignatureSignerCallData =
+                abi.encodeWithSignature("addContractSignatureSigner(address)", contractSignatureSigner);
+            (bool contractSignatureSignerSuccess, bytes memory contractSignatureSignerReturnData) =
+                gatewayWalletProxy.call(addContractSignatureSignerCallData);
+            require(
+                contractSignatureSignerSuccess,
+                string(abi.encodePacked("addContractSignatureSigner failed: ", contractSignatureSignerReturnData))
+            );
+
+            console.log("Successfully added contract signature signer:", contractSignatureSigner);
+            vm.stopBroadcast();
+        } else {
+            console.log("\n=== Step 5: Add contract signature signer (skipped - not set) ===");
+        }
+
+        // Step 6: Add batch signer (optional)
         if (batchSigner != address(0)) {
-            console.log("\n=== Step 4: Add batch signer ===");
+            console.log("\n=== Step 6: Add batch signer ===");
             vm.startBroadcast(gatewayWalletOwner);
 
             bytes memory addBatchSignerCallData = abi.encodeWithSignature("addBatchSigner(address)", batchSigner);
@@ -138,13 +196,19 @@ contract UpgradeGatewayWallet is Script {
             console.log("Successfully added batch signer:", batchSigner);
             vm.stopBroadcast();
         } else {
-            console.log("\n=== Step 4: Add batch signer (skipped - not set) ===");
+            console.log("\n=== Step 6: Add batch signer (skipped - not set) ===");
         }
 
-        // Step 5: Validate deployed state
-        console.log("\n=== Step 5: Validate post-upgrade state ===");
+        // Step 7: Validate deployed state
+        console.log("\n=== Step 7: Validate post-upgrade state ===");
         _validateUpgrade(
-            gatewayWalletProxy, newImplAddress, gatewayWalletOwner, contractSignersAllowlister, batchSigner
+            gatewayWalletProxy,
+            newImplAddress,
+            gatewayWalletOwner,
+            contractSignersAllowlister,
+            contractSignersDisallowlister,
+            contractSignatureSigner,
+            batchSigner
         );
 
         // Summary
@@ -153,6 +217,12 @@ contract UpgradeGatewayWallet is Script {
         console.log("New implementation:", newImplAddress);
         if (contractSignersAllowlister != address(0)) {
             console.log("Contract signers allowlister:", contractSignersAllowlister);
+        }
+        if (contractSignersDisallowlister != address(0)) {
+            console.log("Contract signers disallowlister:", contractSignersDisallowlister);
+        }
+        if (contractSignatureSigner != address(0)) {
+            console.log("Contract signature signer:", contractSignatureSigner);
         }
         if (batchSigner != address(0)) {
             console.log("Batch signer:", batchSigner);
@@ -200,6 +270,8 @@ contract UpgradeGatewayWallet is Script {
         address expectedImpl,
         address expectedOwner,
         address expectedAllowlister,
+        address expectedDisallowlister,
+        address expectedContractSignatureSigner,
         address expectedBatchSigner
     ) internal view {
         GatewayWallet wallet = GatewayWallet(proxyAddress);
@@ -226,6 +298,20 @@ contract UpgradeGatewayWallet is Script {
             address actualAllowlister = wallet.contractSignersAllowlister();
             require(actualAllowlister == expectedAllowlister, "Contract signers allowlister mismatch");
             console.log("[OK] Contract signers allowlister set to:", actualAllowlister);
+        }
+
+        // Validate contract signers disallowlister (if it was set)
+        if (expectedDisallowlister != address(0)) {
+            address actualDisallowlister = wallet.contractSignersDisallowlister();
+            require(actualDisallowlister == expectedDisallowlister, "Contract signers disallowlister mismatch");
+            console.log("[OK] Contract signers disallowlister set to:", actualDisallowlister);
+        }
+
+        // Validate contract signature signer was added (if it was set)
+        if (expectedContractSignatureSigner != address(0)) {
+            bool isContractSignatureSigner = wallet.isContractSignatureSigner(expectedContractSignatureSigner);
+            require(isContractSignatureSigner, "Contract signature signer not registered");
+            console.log("[OK] Contract signature signer registered:", expectedContractSignatureSigner);
         }
 
         // Validate batch signer was added (if it was set)

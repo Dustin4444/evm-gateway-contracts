@@ -20,7 +20,7 @@ pragma solidity ^0.8.29;
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import {CommonBase} from "forge-std/Base.sol";
 import {GatewayMinter} from "src/GatewayMinter.sol";
-import {GatewayWallet} from "src/GatewayWallet.sol";
+import {GatewayWallet, GatewayWalletInitConfig} from "src/GatewayWallet.sol";
 import {UpgradeablePlaceholder} from "src/UpgradeablePlaceholder.sol";
 
 /// Helpers for deploying the contracts during tests
@@ -78,20 +78,20 @@ abstract contract DeployUtils is CommonBase {
     }
 
     function _walletInitializationCall(address owner, uint32 domain) internal pure returns (bytes memory) {
-        return abi.encodeCall(
-            GatewayWallet.initialize,
-            (
-                owner, // pauser
-                owner, // denylister
-                _initiallySupportedTokens(), // supported tokens
-                domain, // domain
-                0, // withdrawal delay
-                owner, // burn signer
-                owner, // fee recipient
-                owner, // contract signers allowlister
-                owner // batch signer
-            )
-        );
+        GatewayWalletInitConfig memory config = GatewayWalletInitConfig({
+            pauser: owner,
+            denylister: owner,
+            supportedTokens: _initiallySupportedTokens(),
+            domain: domain,
+            withdrawalDelay: 0,
+            burnSigner: owner,
+            feeRecipient: owner,
+            contractSignersAllowlister: owner,
+            contractSignersDisallowlister: owner,
+            contractSignatureSigner: owner,
+            batchSigner: owner
+        });
+        return abi.encodeCall(GatewayWallet.initialize, (config));
     }
 
     function _minterInitializationCall(address owner, uint32 domain) internal pure returns (bytes memory) {

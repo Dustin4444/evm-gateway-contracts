@@ -47,7 +47,12 @@ contract DeployGatewayWalletTest is Test {
         vm.setEnv(
             "GATEWAYWALLET_CONTRACT_SIGNERS_ALLOWLISTER_ADDRESS", vm.toString(makeAddr("contractSignersAllowlister"))
         );
+        vm.setEnv("GATEWAYWALLET_CONTRACT_SIGNATURE_SIGNER_ADDRESS", vm.toString(makeAddr("contractSignatureSigner")));
         vm.setEnv("GATEWAYWALLET_BATCHSIGNER_ADDRESS", vm.toString(makeAddr("batchSigner")));
+        vm.setEnv(
+            "GATEWAYWALLET_CONTRACT_SIGNERS_DISALLOWLISTER_ADDRESS",
+            vm.toString(makeAddr("contractSignersDisallowlister"))
+        );
 
         // Initialize the deployer script
         deployer = new DeployGatewayWallet();
@@ -56,8 +61,9 @@ contract DeployGatewayWalletTest is Test {
     function testDeployGatewayWallet() public {
         // Execute the deployment script and verify the addresses.
         (address placeholderAddress, address implAddress, address proxyAddress) = deployer.run();
-        assertEq(placeholderAddress, 0x863dBa32816075Df59609319718449618Eeb6Eb7);
-        assertEq(implAddress, 0xD6c2F4aB2ff242834dBeC5a304Bf4BA35fE4889e);
-        assertEq(proxyAddress, 0x82315cB7F3598180ED882904D1bDf4ee68139db5);
+        assertEq(placeholderAddress, 0x6D42049947A98EEde4893117C3dC7B043D002d64);
+        // Updated due to ContractSignerNeverAllowlisted check in disallowContractSigner
+        assertEq(implAddress, 0x49229906e6679A9235c1870655c8Fb7DAdFdEBAA);
+        assertEq(proxyAddress, 0x483e6Cc03E5c6a85d6C1Cb0C6833110e23226EcB);
     }
 }

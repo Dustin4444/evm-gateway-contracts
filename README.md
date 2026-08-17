@@ -13,6 +13,48 @@ These are the contracts that support the Circle Gateway product. See the contrac
 - Follow the instructions of that command to source env file
 - run `foundryup --install v1.0.0`
 
+## Compilation
+
+### Important: Always Use `yarn artifacts` or `yarn build`
+
+**⚠️ WARNING: Do NOT use `forge build` directly!**
+
+The Gateway contracts require different compiler settings for different contracts:
+- **ERC1967Proxy** and **UpgradeablePlaceholder**: Compiled WITHOUT `via_ir` to maintain deterministic addresses across chain deployments
+- **GatewayWallet** and **GatewayMinter**: Compiled WITH `via_ir` for bytecode size optimization
+
+Running `forge build` directly will compile all contracts with the same settings from `foundry.toml`, which will produce incorrect bytecode and break address determinism.
+
+### Correct Compilation Commands
+
+Always use one of these commands:
+```bash
+yarn artifacts  # Recommended
+yarn build      # Alias for yarn artifacts
+```
+
+These commands run the custom compilation script (`scripts/compile-artifacts.sh`) that:
+1. Compiles proxy and placeholder contracts WITHOUT via_ir
+2. Compiles implementation contracts WITH via_ir
+3. Saves the correctly compiled artifacts to `script/compiled-contract-artifacts/`
+
+### Why This Matters
+
+The deployment scripts use the artifacts in `script/compiled-contract-artifacts/`. If you use `forge build` instead:
+- Proxy addresses will change, breaking cross-chain deployments
+- Implementation contracts may exceed the 24KB EIP-170 size limit
+- Deployed contracts won't match what you tested
+
+### For Development
+
+- **Testing**: `yarn test` - Tests compile with via_ir for size-optimized bytecode
+- **Compilation**: `yarn build` or `yarn artifacts` - Creates deployment artifacts with split compilation
+- **Size Check**: `yarn sizes` - Verifies contracts are under EIP-170 limit
+- **Address Verification**: `yarn verify-addresses` - Verifies proxy addresses are correct
+- **CI**: `yarn ci` - Runs full pipeline (format, lint, artifacts, sizes, tests)
+
+Note: Tests use the `[profile.test]` configuration with `via_ir=true` globally, which differs from production's split compilation (proxies without via_ir, implementations with via_ir). Tests that verify deployment addresses read from `script/compiled-contract-artifacts/` to test actual production bytecode. See COMPILATION.md for details.
+
 ## Deployment
 
 ### How it works
@@ -29,7 +71,7 @@ The reason of setting owner of `UpgradablePlaceholder` to Create2Factory address
 
 Since the owner of `UpgradablePlaceholder` is Create2Factory and only the owner can perform `upgradeToAndCall`, we decided to use `Create2Factory.deployAndMultiCall` to upgrade to actual implementation in the proxy deployment call.
 
-**Note**: The deployment scripts always deploy the latest compiled version of the contracts. Make sure to compile your contracts with `yarn artifacts` before deployment to ensure you're deploying the most up-to-date implementation.
+**Note**: The deployment scripts always deploy the latest compiled version of the contracts. Make sure to compile your contracts with `yarn artifacts` (or `yarn build`) before deployment to ensure you're deploying the most up-to-date implementation with the correct compiler settings.
 
 ### Prerequisites
 
@@ -79,7 +121,7 @@ ENV=$ENV forge script script/001_DeployGatewayWallet.sol --rpc-url $RPC_URL -vvv
 ENV=$ENV forge script script/002_DeployGatewayMinter.sol --rpc-url $RPC_URL -vvvv --slow --force
 ```
 
-- `ENV`: Use `LOCAL` for local deployment. Or choose from `TESTNET_STAGING`, `TESTNET_PROD`, and `MAINNET_PROD`.
+- `ENV`: Use `LOCAL` for local deployment. Or choose from `TESTNET_TESTING`, `TESTNET_STAGING`, `TESTNET_PROD`, and `MAINNET_PROD`.
 - `RPC_URL`: The rpc url for the targeted blockchain. use `http://127.0.0.1:8485` for local deployment.
 
 The generated transaction data will be available in the `broadcast/` directory and can be used for signing.
@@ -113,7 +155,7 @@ ENV=$ENV forge script script/004_UpgradeGatewayWallet.sol:UpgradeGatewayWallet -
 ENV=$ENV forge script script/004_UpgradeGatewayWallet.sol:UpgradeGatewayWallet --rpc-url $RPC_URL -vvvv --slow --force --broadcast
 ```
 
-- `ENV`: Use `LOCAL` for local deployment. Or choose from `TESTNET_STAGING`, `TESTNET_PROD`, and `MAINNET_PROD`.
+- `ENV`: Use `LOCAL` for local deployment. Or choose from `TESTNET_TESTING`, `TESTNET_STAGING`, `TESTNET_PROD`, and `MAINNET_PROD`.
 - `RPC_URL`: The rpc url for the targeted blockchain.
 - `GATEWAYMINTER_WALLET_ADDRESS`: Must be set in your environment to the proxy address you want to upgrade.
 - `GATEWAYWALLET_OWNER_ADDRESS`: Must be set to the current owner of the GatewayWallet proxy (required for the upgrade call).
@@ -162,6 +204,7 @@ We have chosen the following prefixes for our top-level contracts:
 | Production | Mainnet | 0x7777777 | 0x2222222 |  |
 | Production | Testnet | 0x0077777 | 0x0022222 | Add zero byte to mainnet addresses |
 | Staging | Testnet | 0x5577777 | 0x5522222 | 5 = "S" for Staging |
+| Testing | Testnet | 0x7E77777 | 0x7E22222 | 7E = "T" for Testing |
 
 To find and verify salts for the Wallet and Minter contracts, correctly set the `ENV` and `RPC_URL` environment variables (and possibly `LOCAL_CREATE2_FACTORY_ADDRESS` depending on your environment). Use any values for all of the other variables, as they do not matter here.
 

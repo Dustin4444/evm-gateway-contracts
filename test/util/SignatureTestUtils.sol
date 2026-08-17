@@ -17,7 +17,9 @@
  */
 pragma solidity ^0.8.29;
 
+import {IERC1271} from "@openzeppelin/contracts/interfaces/IERC1271.sol";
 import {IERC20Permit} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Permit.sol";
+import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {MessageHashUtils} from "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
 import {Test} from "forge-std/Test.sol";
 import {GatewayWallet} from "src/GatewayWallet.sol";
@@ -26,6 +28,23 @@ import {Attestation, AttestationSet} from "src/lib/Attestations.sol";
 import {BurnIntentLib} from "src/lib/BurnIntentLib.sol";
 import {BurnIntent, BurnIntentSet} from "src/lib/BurnIntents.sol";
 import {TransferSpec} from "src/lib/TransferSpec.sol";
+
+/// @notice Mock EIP-1271 contract signer for testing
+contract MockEIP1271Signer is IERC1271 {
+    address public owner;
+
+    constructor(address _owner) {
+        owner = _owner;
+    }
+
+    function isValidSignature(bytes32 hash, bytes calldata signature) external view override returns (bytes4) {
+        address recoveredSigner = ECDSA.recover(hash, signature);
+        if (recoveredSigner == owner) {
+            return IERC1271.isValidSignature.selector;
+        }
+        return bytes4(0);
+    }
+}
 
 contract SignatureTestUtils is Test {
     using MessageHashUtils for bytes32;

@@ -26,6 +26,9 @@ import {Mints} from "src/modules/minter/Mints.sol";
 /// or on a different chain. Either operation requires a signed attestation from the `attestationSigner` configured in
 /// the contract. See the documentation for the `GatewayWallet` contract for more details.
 contract GatewayMinter is GatewayCommon, Mints {
+    /// Thrown when attempting to renounce ownership
+    error RenounceOwnershipDisabled();
+
     /// Thrown when the length of `supportedTokens_` and `tokenMintAuthorities_` do not match
     error MismatchedLengthTokenAndTokenMintAuthorities();
 
@@ -60,5 +63,11 @@ contract GatewayMinter is GatewayCommon, Mints {
 
         __GatewayCommon_init(pauser_, denylister_, supportedTokens_, domain_);
         __Mints_init(attestationSigner_, supportedTokens_, tokenMintAuthorities_);
+    }
+
+    /// @notice Renouncing ownership is disabled to prevent accidental loss of contract control
+    /// @dev Overrides OwnableUpgradeable.renounceOwnership() to always revert
+    function renounceOwnership() public view override onlyOwner {
+        revert RenounceOwnershipDisabled();
     }
 }

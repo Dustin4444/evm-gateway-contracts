@@ -99,6 +99,7 @@ contract GatewayWalletBurnsEIP1271Test is SignatureTestUtils, DeployUtils {
             wallet.addBurnSigner(burnSigner);
             wallet.updateFeeRecipient(feeRecipient);
             wallet.updateContractSignersAllowlister(allowlister);
+            wallet.updateContractSignersDisallowlister(allowlister);
         }
         vm.stopPrank();
 
@@ -572,5 +573,87 @@ contract GatewayWalletBurnsEIP1271Test is SignatureTestUtils, DeployUtils {
         Cursor memory cursor = BurnIntentLib.cursor(encodedIntentSet);
         address sourceSigner = BurnIntentLib._getSourceSignerFromCursor(cursor);
         assertEq(sourceSigner, address(validContractSigner), "Should return first intent's signer address");
+    }
+
+    // ===== tryRecover Behavior Tests =====
+
+    function test_nonStandardSignatureCanUseEIP1271Path() public {
+        // Deploy a mock EIP-1271 contract that accepts non-standard signature formats
+        MockNonStandardEIP1271Signer nonStandardSigner = new MockNonStandardEIP1271Signer();
+
+        // Allowlist the contract
+        vm.prank(allowlister);
+        wallet.allowlistContractSigner(address(nonStandardSigner));
+
+        // Add delegation
+        vm.prank(depositor);
+        wallet.addDelegate(address(usdc), address(nonStandardSigner));
+
+        // Create burn intent
+        BurnIntent memory intent = _createBurnIntent(address(nonStandardSigner), 1000e6);
+        bytes memory encodedIntent = BurnIntentLib.encodeBurnIntent(intent);
+
+        // Create a non-standard signature (96 bytes instead of 65)
+        // This simulates a multi-sig or other non-standard format
+        bytes memory nonStandardSignature = new bytes(96);
+
+        // Record initial state
+        uint256 initialAvailable = wallet.availableBalance(address(usdc), depositor);
+
+        // Execute burn - should succeed via EIP-1271 path (Path 3)
+        // The tryRecover will return an error for the 96-byte signature,
+        // but it won't revert, allowing EIP-1271 validation to proceed
+        _executeBurn(encodedIntent, nonStandardSignature, 0.5e6);
+
+        // Verify burn succeeded
+        assertEq(
+            wallet.availableBalance(address(usdc), depositor),
+            initialAvailable - 1000.5e6,
+            "Non-standard signature should work with EIP-1271"
+        );
+    }
+
+    function test_malformedSignatureRevertsWhenNoPathMatches() public {
+        // Create burn intent with a regular EOA signer (not allowlisted, not TEE)
+        BurnIntent memory intent = _createBurnIntent(depositor, 1000e6);
+        bytes memory encodedIntent = BurnIntentLib.encodeBurnIntent(intent);
+
+        // Create a malformed signature (64 bytes - invalid ECDSA length)
+        bytes memory malformedSignature = new bytes(64);
+
+        // Should revert with InvalidSignature because:
+        // - Path 1 (EOA): ECDSA recovery fails (err != NoError), so skip
+        // - Path 2 (TEE): ECDSA recovery fails (err != NoError), so skip
+        // - Path 3 (EIP-1271): depositor is not allowlisted
+        // - Finally: ECDSA recovery failed (err != NoError), so revert InvalidSignature
+        vm.expectRevert(abi.encodeWithSelector(Burns.InvalidSignature.selector));
+        _executeBurn(encodedIntent, malformedSignature, 0.5e6);
+    }
+
+    function test_malformedSignatureRevertsForTEEPath() public {
+        // Even if we have a TEE signer registered, a malformed signature for a non-TEE address should fail
+        (address teeSigner,) = makeAddrAndKey("teeSigner");
+        vm.prank(owner);
+        wallet.addContractSignatureSigner(teeSigner);
+
+        // Create burn intent with depositor (not delegated, not allowlisted)
+        BurnIntent memory intent = _createBurnIntent(depositor, 1000e6);
+        bytes memory encodedIntent = BurnIntentLib.encodeBurnIntent(intent);
+
+        // Malformed signature
+        bytes memory malformedSignature = new bytes(64);
+
+        // Should revert because ECDSA recovery fails and depositor doesn't match any path
+        vm.expectRevert(abi.encodeWithSelector(Burns.InvalidSignature.selector));
+        _executeBurn(encodedIntent, malformedSignature, 0.5e6);
+    }
+}
+
+// Mock EIP-1271 contract that accepts any signature format (simulates multi-sig or custom validation)
+contract MockNonStandardEIP1271Signer is IERC1271 {
+    function isValidSignature(bytes32, bytes calldata) external pure override returns (bytes4) {
+        // Always return valid for testing purposes
+        // In practice, this would perform custom validation logic
+        return IERC1271.isValidSignature.selector;
     }
 }
