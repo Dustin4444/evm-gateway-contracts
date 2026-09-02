@@ -31,6 +31,11 @@ then
   # 5 = "S" for Staging
   WALLET_PREFIX="5577777"
   MINTER_PREFIX="5522222"
+elif [[ $ENV == "TESTNET_TESTING" ]]
+then
+  # 7E = "T" for Testing
+  WALLET_PREFIX="7E77777"
+  MINTER_PREFIX="7E22222"
 fi
 
 

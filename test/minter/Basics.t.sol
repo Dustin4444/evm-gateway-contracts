@@ -229,4 +229,10 @@ contract GatewayMinterBasicsTest is OwnershipTest, DeployUtils {
 
         assertFalse(minter.isAttestationSigner(oldAttestationSigner));
     }
+
+    function test_renounceOwnership_isDisabled() public {
+        vm.prank(owner);
+        vm.expectRevert(GatewayMinter.RenounceOwnershipDisabled.selector);
+        minter.renounceOwnership();
+    }
 }

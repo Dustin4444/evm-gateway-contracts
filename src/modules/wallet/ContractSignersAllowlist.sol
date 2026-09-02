@@ -53,10 +53,21 @@ contract ContractSignersAllowlist is Initializable, Ownable2StepUpgradeable {
     /// @param newAllowlister   The new allowlister address
     event ContractSignersAllowlisterChanged(address indexed oldAllowlister, address indexed newAllowlister);
 
-    /// Thrown when an unauthorized address attempts to allowlist or disallow contract signers
+    /// Emitted when the contract signers disallowlister address is updated
+    ///
+    /// @param oldDisallowlister   The old disallowlister address
+    /// @param newDisallowlister   The new disallowlister address
+    event ContractSignersDisallowlisterChanged(address indexed oldDisallowlister, address indexed newDisallowlister);
+
+    /// Thrown when an unauthorized address attempts to allowlist contract signers
     ///
     /// @param addr   The unauthorized address
     error UnauthorizedContractSignerAllowlister(address addr);
+
+    /// Thrown when an unauthorized address attempts to disallow contract signers
+    ///
+    /// @param addr   The unauthorized address
+    error UnauthorizedContractSignerDisallowlister(address addr);
 
     /// Thrown when attempting to set the zero address as a contract signer
     error ZeroAddressContractSigner();
@@ -64,17 +75,35 @@ contract ContractSignersAllowlist is Initializable, Ownable2StepUpgradeable {
     /// Thrown when attempting to set the zero address as the allowlister
     error ZeroAddressAllowlister();
 
-    /// Initializes the `contractSignersAllowlister` role
+    /// Thrown when attempting to set the zero address as the disallowlister
+    error ZeroAddressDisallowlister();
+
+    /// Thrown when attempting to disallow a contract that has never been allowlisted
     ///
-    /// @param allowlister_   The initial contract signers allowlister address
-    function __ContractSignersAllowlist_init(address allowlister_) internal onlyInitializing {
+    /// @param contractAddr   The contract address that has never been allowlisted
+    error ContractSignerNeverAllowlisted(address contractAddr);
+
+    /// Initializes the `contractSignersAllowlister` and `contractSignersDisallowlister` roles
+    ///
+    /// @param allowlister_      The initial contract signers allowlister address
+    /// @param disallowlister_   The initial contract signers disallowlister address
+    function __ContractSignersAllowlist_init(address allowlister_, address disallowlister_) internal onlyInitializing {
         updateContractSignersAllowlister(allowlister_);
+        updateContractSignersDisallowlister(disallowlister_);
     }
 
     /// Restricts the caller to the `contractSignersAllowlister` role, reverting with an error for other callers
     modifier onlyContractSignersAllowlister() {
         if (msg.sender != ContractSignersAllowlistStorage.get().allowlister) {
             revert UnauthorizedContractSignerAllowlister(msg.sender);
+        }
+        _;
+    }
+
+    /// Restricts the caller to the `contractSignersDisallowlister` role, reverting with an error for other callers
+    modifier onlyContractSignersDisallowlister() {
+        if (msg.sender != ContractSignersAllowlistStorage.get().disallowlister) {
+            revert UnauthorizedContractSignerDisallowlister(msg.sender);
         }
         _;
     }
@@ -88,11 +117,18 @@ contract ContractSignersAllowlist is Initializable, Ownable2StepUpgradeable {
             == ContractSignerAllowlistStatus.Allowlisted;
     }
 
-    /// The address with the `contractSignersAllowlister` role that can modify the allowlist
+    /// The address with the `contractSignersAllowlister` role that can add contracts to the allowlist
     ///
     /// @return   The address of the contract signers allowlister
     function contractSignersAllowlister() public view returns (address) {
         return ContractSignersAllowlistStorage.get().allowlister;
+    }
+
+    /// The address with the `contractSignersDisallowlister` role that can remove contracts from the allowlist
+    ///
+    /// @return   The address of the contract signers disallowlister
+    function contractSignersDisallowlister() public view returns (address) {
+        return ContractSignersAllowlistStorage.get().disallowlister;
     }
 
     /// Allowlists a contract for EIP-1271 signing of burn intents
@@ -107,15 +143,18 @@ contract ContractSignersAllowlist is Initializable, Ownable2StepUpgradeable {
 
     /// Removes a previously-allowlisted contract from the signers allowlist
     ///
-    /// @dev May only be called by the `contractSignersAllowlister` role
+    /// @dev May only be called by the `contractSignersDisallowlister` role
     ///
     /// @param contractAddr   The contract address to be removed from the allowlist
-    function disallowContractSigner(address contractAddr) external onlyContractSignersAllowlister {
+    function disallowContractSigner(address contractAddr) external onlyContractSignersDisallowlister {
+        if (!_wasEverAllowlistedContractSigner(contractAddr)) {
+            revert ContractSignerNeverAllowlisted(contractAddr);
+        }
         _setContractSignerAllowlist(contractAddr, ContractSignerAllowlistStatus.Revoked);
         emit ContractSignerDisallowed(contractAddr);
     }
 
-    /// Sets the address that is allowed to modify the contract signers allowlist
+    /// Sets the address that is allowed to add contracts to the signers allowlist
     ///
     /// @dev May only be called by the `owner` role
     ///
@@ -124,6 +163,17 @@ contract ContractSignersAllowlist is Initializable, Ownable2StepUpgradeable {
         address oldAllowlister = ContractSignersAllowlistStorage.get().allowlister;
         _setContractSignersAllowlister(newAllowlister);
         emit ContractSignersAllowlisterChanged(oldAllowlister, newAllowlister);
+    }
+
+    /// Sets the address that is allowed to remove contracts from the signers allowlist
+    ///
+    /// @dev May only be called by the `owner` role
+    ///
+    /// @param newDisallowlister   The new contract signers disallowlister address
+    function updateContractSignersDisallowlister(address newDisallowlister) public onlyOwner {
+        address oldDisallowlister = ContractSignersAllowlistStorage.get().disallowlister;
+        _setContractSignersDisallowlister(newDisallowlister);
+        emit ContractSignersDisallowlisterChanged(oldDisallowlister, newDisallowlister);
     }
 
     /// Sets the allowlist status of a contract address
@@ -137,7 +187,7 @@ contract ContractSignersAllowlist is Initializable, Ownable2StepUpgradeable {
         ContractSignersAllowlistStorage.get().allowlistMapping[contractAddr] = status;
     }
 
-    /// Sets the address that is allowed to modify the contract signers allowlist
+    /// Sets the address that is allowed to add contracts to the signers allowlist
     ///
     /// @param newAllowlister   The new contract signers allowlister address
     function _setContractSignersAllowlister(address newAllowlister) internal {
@@ -145,6 +195,16 @@ contract ContractSignersAllowlist is Initializable, Ownable2StepUpgradeable {
             revert ZeroAddressAllowlister();
         }
         ContractSignersAllowlistStorage.get().allowlister = newAllowlister;
+    }
+
+    /// Sets the address that is allowed to remove contracts from the signers allowlist
+    ///
+    /// @param newDisallowlister   The new contract signers disallowlister address
+    function _setContractSignersDisallowlister(address newDisallowlister) internal {
+        if (newDisallowlister == address(0)) {
+            revert ZeroAddressDisallowlister();
+        }
+        ContractSignersAllowlistStorage.get().disallowlister = newDisallowlister;
     }
 
     /// Check if an address has ever been allowlisted for EIP-1271 signing. This includes both currently-valid and
@@ -167,8 +227,10 @@ library ContractSignersAllowlistStorage {
     struct Data {
         /// Mapping of contract addresses to their allowlist status for EIP-1271 signing
         mapping(address contractAddr => ContractSignerAllowlistStatus status) allowlistMapping;
-        /// The address that is allowed to manage the contract signers allowlist
+        /// The address that is allowed to add contracts to the signers allowlist
         address allowlister;
+        /// The address that is allowed to remove contracts from the signers allowlist
+        address disallowlister;
     }
 
     /// `keccak256(abi.encode(uint256(keccak256(bytes("circle.gateway.ContractSignersAllowlist"))) - 1)) & ~bytes32(uint256(0xff))`

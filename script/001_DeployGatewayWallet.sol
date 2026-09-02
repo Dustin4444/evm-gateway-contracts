@@ -20,6 +20,7 @@ pragma solidity ^0.8.29;
 import {console} from "forge-std/console.sol";
 import {EnvSelector, EnvConfig} from "script/000_Constants.sol";
 import {BaseBytecodeDeployScript} from "script/BaseBytecodeDeployScript.sol";
+import {GatewayWallet, GatewayWalletInitConfig} from "src/GatewayWallet.sol";
 
 /// @title DeployGatewayWallet
 /// @notice Deployment script for GatewayWallet implementation and proxy with initialization
@@ -38,31 +39,24 @@ contract DeployGatewayWallet is BaseBytecodeDeployScript {
     /// @dev Prepares initialization data for GatewayWallet
     /// @return Encoded initialization call data including all configuration parameters
     function prepareInitData() internal view returns (bytes memory) {
-        address gatewayWalletPauser = vm.envAddress("GATEWAYWALLET_PAUSER_ADDRESS");
-        address gatewayWalletDenylister = vm.envAddress("GATEWAYWALLET_DENYLISTER_ADDRESS");
         address[] memory supportedTokens = new address[](1);
         supportedTokens[0] = vm.envAddress("GATEWAYWALLET_SUPPORTED_TOKEN_1");
-        uint32 domain = uint32(vm.envUint("GATEWAYWALLET_DOMAIN"));
-        uint256 withdrawalDelay = vm.envUint("GATEWAYWALLET_WITHDRAWAL_DELAY");
-        address gatewayWalletBurnSigner = vm.envAddress("GATEWAYWALLET_BURNSIGNER_ADDRESS");
-        address gatewayWalletFeeRecipient = vm.envAddress("GATEWAYWALLET_FEERECIPIENT_ADDRESS");
-        address gatewayWalletContractSignersAllowlister =
-            vm.envAddress("GATEWAYWALLET_CONTRACT_SIGNERS_ALLOWLISTER_ADDRESS");
-        address gatewayWalletBatchSigner = vm.envAddress("GATEWAYWALLET_BATCHSIGNER_ADDRESS");
 
-        // Encode initialization call with all parameters
-        return abi.encodeWithSignature(
-            "initialize(address,address,address[],uint32,uint256,address,address,address,address)",
-            gatewayWalletPauser,
-            gatewayWalletDenylister,
-            supportedTokens,
-            domain,
-            withdrawalDelay,
-            gatewayWalletBurnSigner,
-            gatewayWalletFeeRecipient,
-            gatewayWalletContractSignersAllowlister,
-            gatewayWalletBatchSigner
-        );
+        GatewayWalletInitConfig memory config = GatewayWalletInitConfig({
+            pauser: vm.envAddress("GATEWAYWALLET_PAUSER_ADDRESS"),
+            denylister: vm.envAddress("GATEWAYWALLET_DENYLISTER_ADDRESS"),
+            supportedTokens: supportedTokens,
+            domain: uint32(vm.envUint("GATEWAYWALLET_DOMAIN")),
+            withdrawalDelay: vm.envUint("GATEWAYWALLET_WITHDRAWAL_DELAY"),
+            burnSigner: vm.envAddress("GATEWAYWALLET_BURNSIGNER_ADDRESS"),
+            feeRecipient: vm.envAddress("GATEWAYWALLET_FEERECIPIENT_ADDRESS"),
+            contractSignersAllowlister: vm.envAddress("GATEWAYWALLET_CONTRACT_SIGNERS_ALLOWLISTER_ADDRESS"),
+            contractSignersDisallowlister: vm.envAddress("GATEWAYWALLET_CONTRACT_SIGNERS_DISALLOWLISTER_ADDRESS"),
+            contractSignatureSigner: vm.envAddress("GATEWAYWALLET_CONTRACT_SIGNATURE_SIGNER_ADDRESS"),
+            batchSigner: vm.envAddress("GATEWAYWALLET_BATCHSIGNER_ADDRESS")
+        });
+
+        return abi.encodeCall(GatewayWallet.initialize, (config));
     }
 
     /// @notice Main deployment function that sets up the entire GatewayWallet system

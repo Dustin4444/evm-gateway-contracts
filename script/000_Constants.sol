@@ -23,7 +23,7 @@ import {Script} from "forge-std/Script.sol";
 /**
  * @title Constants
  * @notice Library containing environment-specific constants for deployment
- * @dev Defines constants for three environments: TESTNET_STAGING, TESTNET_PROD and MAINNET_PROD
+ * @dev Defines constants for four environments: TESTNET_TESTING, TESTNET_STAGING, TESTNET_PROD and MAINNET_PROD
  */
 library Constants {
     // Local environment constants
@@ -31,6 +31,16 @@ library Constants {
     bytes32 internal constant LOCAL_MINTER_SALT = bytes32(uint256(1));
     bytes32 internal constant LOCAL_WALLET_PROXY_SALT = bytes32(uint256(0));
     bytes32 internal constant LOCAL_MINTER_PROXY_SALT = bytes32(uint256(1));
+
+    // Testnet testing environment constants
+    bytes32 internal constant TESTNET_TESTING_WALLET_SALT = bytes32(uint256(50));
+    bytes32 internal constant TESTNET_TESTING_MINTER_SALT = bytes32(uint256(60));
+    bytes32 internal constant TESTNET_TESTING_WALLET_PROXY_SALT =
+        0xa4bfe213eb409980792c6ed28e67b1c200ae7b70ef17e8dbd9bb71dc40aeb3b5;
+    bytes32 internal constant TESTNET_TESTING_MINTER_PROXY_SALT =
+        0xe6f063b15e86756dc58c6434d88a1c5ab5b6a6f2dcf1fa3e039aa64508cd216c;
+    address internal constant TESTNET_TESTING_CREATE2FACTORY_ADDRESS = 0x643151056F7cCCD36030d6507a8C07Ed4a46E8D2;
+    address internal constant TESTNET_TESTING_DEPLOYER_ADDRESS = 0xD1e4098de8667a491Eb2Bf5acf09ED7F67260BCA;
 
     // Testnet staging environment constants
     bytes32 internal constant TESTNET_STAGING_WALLET_SALT = bytes32(uint256(10));
@@ -86,7 +96,7 @@ struct EnvConfig {
 /**
  * @title EnvSelector
  * @notice Helper contract to select environment configuration based on ENV variable
- * @dev Provides configuration for different deployment environments (LOCAL, TESTNET_STAGING, TESTNET_PROD, MAINNET_PROD)
+ * @dev Provides configuration for different deployment environments (LOCAL, TESTNET_TESTING, TESTNET_STAGING, TESTNET_PROD, MAINNET_PROD)
  *      The environment is selected by setting the ENV environment variable before running the script
  *      Default environment is LOCAL if ENV is not specified
  */
@@ -104,6 +114,8 @@ contract EnvSelector is Script {
         // Select environment configuration based on ENV value
         if (keccak256(bytes(env)) == keccak256(bytes("LOCAL"))) {
             config = getLocalConfig();
+        } else if (keccak256(bytes(env)) == keccak256(bytes("TESTNET_TESTING"))) {
+            config = getTestnetTestingConfig();
         } else if (keccak256(bytes(env)) == keccak256(bytes("TESTNET_STAGING"))) {
             config = getTestnetStagingConfig();
         } else if (keccak256(bytes(env)) == keccak256(bytes("TESTNET_PROD"))) {
@@ -129,6 +141,21 @@ contract EnvSelector is Script {
             minterProxySalt: Constants.LOCAL_MINTER_PROXY_SALT,
             factoryAddress: localCreate2Factory,
             deployerAddress: localDeployer
+        });
+    }
+
+    /**
+     * @notice Get configuration for the TESTNET_TESTING environment
+     * @return EnvConfig with TESTNET_TESTING-specific values
+     */
+    function getTestnetTestingConfig() public pure returns (EnvConfig memory) {
+        return EnvConfig({
+            walletSalt: Constants.TESTNET_TESTING_WALLET_SALT,
+            minterSalt: Constants.TESTNET_TESTING_MINTER_SALT,
+            walletProxySalt: Constants.TESTNET_TESTING_WALLET_PROXY_SALT,
+            minterProxySalt: Constants.TESTNET_TESTING_MINTER_PROXY_SALT,
+            factoryAddress: Constants.TESTNET_TESTING_CREATE2FACTORY_ADDRESS,
+            deployerAddress: Constants.TESTNET_TESTING_DEPLOYER_ADDRESS
         });
     }
 

@@ -19,10 +19,11 @@ pragma solidity ^0.8.29;
 
 import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
-import {GatewayWallet} from "src/GatewayWallet.sol";
+import {GatewayWallet, GatewayWalletInitConfig} from "src/GatewayWallet.sol";
 import {AddressLib} from "src/lib/AddressLib.sol";
 import {Batches} from "src/modules/wallet/Batches.sol";
 import {Burns} from "src/modules/wallet/Burns.sol";
+import {ContractSignatureSigners} from "src/modules/wallet/ContractSignatureSigners.sol";
 import {DeployUtils} from "test/util/DeployUtils.sol";
 import {ForkTestUtils} from "test/util/ForkTestUtils.sol";
 import {OwnershipTest} from "test/util/OwnershipTest.sol";
@@ -45,9 +46,20 @@ contract GatewayWalletBasicsTest is OwnershipTest, DeployUtils {
     function test_initialize_revertWhenReinitialized() public {
         vm.startPrank(owner);
         vm.expectRevert(abi.encodeWithSelector(Initializable.InvalidInitialization.selector));
-        wallet.initialize(
-            address(0), address(0), new address[](0), uint32(0), 1, address(0), address(0), address(0), address(0)
-        );
+        GatewayWalletInitConfig memory config = GatewayWalletInitConfig({
+            pauser: address(0),
+            denylister: address(0),
+            supportedTokens: new address[](0),
+            domain: uint32(0),
+            withdrawalDelay: 1,
+            burnSigner: address(0),
+            feeRecipient: address(0),
+            contractSignersAllowlister: address(0),
+            contractSignersDisallowlister: address(0),
+            contractSignatureSigner: address(0),
+            batchSigner: address(0)
+        });
+        wallet.initialize(config);
     }
 
     function test_addBurnSigner_revertWhenNotOwner() public {
@@ -277,5 +289,108 @@ contract GatewayWalletBasicsTest is OwnershipTest, DeployUtils {
         vm.stopPrank();
 
         assertFalse(wallet.isBatchSigner(oldBatchSigner));
+    }
+
+    function test_addContractSignatureSigner_revertWhenNotOwner() public {
+        address randomCaller = makeAddr("random");
+        address newContractSignatureSigner = makeAddr("newContractSignatureSigner");
+
+        vm.startPrank(randomCaller);
+        vm.expectRevert(abi.encodeWithSelector(OwnableUpgradeable.OwnableUnauthorizedAccount.selector, randomCaller));
+        wallet.addContractSignatureSigner(newContractSignatureSigner);
+        vm.stopPrank();
+    }
+
+    function test_removeContractSignatureSigner_revertWhenNotOwner() public {
+        address randomCaller = makeAddr("random");
+        // owner is the initial contract signature signer
+        address oldContractSignatureSigner = wallet.owner();
+
+        vm.startPrank(randomCaller);
+        vm.expectRevert(abi.encodeWithSelector(OwnableUpgradeable.OwnableUnauthorizedAccount.selector, randomCaller));
+        wallet.removeContractSignatureSigner(oldContractSignatureSigner);
+        vm.stopPrank();
+    }
+
+    function test_addContractSignatureSigner_revertWhenZeroAddress() public {
+        vm.startPrank(owner);
+        vm.expectRevert(AddressLib.InvalidAddress.selector);
+        wallet.addContractSignatureSigner(address(0));
+        vm.stopPrank();
+    }
+
+    function test_removeContractSignatureSigner_revertWhenZeroAddress() public {
+        vm.startPrank(owner);
+        vm.expectRevert(AddressLib.InvalidAddress.selector);
+        wallet.removeContractSignatureSigner(address(0));
+        vm.stopPrank();
+    }
+
+    function test_addContractSignatureSigner_success(address newContractSignatureSigner) public {
+        vm.assume(newContractSignatureSigner != address(0));
+
+        vm.expectEmit(true, false, false, false, address(wallet));
+        emit ContractSignatureSigners.ContractSignatureSignerAdded(newContractSignatureSigner);
+
+        vm.startPrank(owner);
+        wallet.addContractSignatureSigner(newContractSignatureSigner);
+        vm.stopPrank();
+
+        assertTrue(wallet.isContractSignatureSigner(newContractSignatureSigner));
+    }
+
+    function test_removeContractSignatureSigner_success() public {
+        // Owner is the initial contract signature signer
+        address oldContractSignatureSigner = wallet.owner();
+
+        vm.expectEmit(true, false, false, false, address(wallet));
+        emit ContractSignatureSigners.ContractSignatureSignerRemoved(oldContractSignatureSigner);
+
+        vm.startPrank(owner);
+        wallet.removeContractSignatureSigner(oldContractSignatureSigner);
+        vm.stopPrank();
+
+        assertFalse(wallet.isContractSignatureSigner(oldContractSignatureSigner));
+    }
+
+    function test_addContractSignatureSigner_idempotent() public {
+        address newContractSignatureSigner = makeAddr("newContractSignatureSigner");
+
+        vm.startPrank(owner);
+        // First update
+        wallet.addContractSignatureSigner(newContractSignatureSigner);
+        assertTrue(wallet.isContractSignatureSigner(newContractSignatureSigner));
+
+        vm.expectEmit(true, false, false, false, address(wallet));
+        emit ContractSignatureSigners.ContractSignatureSignerAdded(newContractSignatureSigner);
+        // Second update
+        wallet.addContractSignatureSigner(newContractSignatureSigner);
+        vm.stopPrank();
+
+        assertTrue(wallet.isContractSignatureSigner(newContractSignatureSigner));
+    }
+
+    function test_removeContractSignatureSigner_idempotent() public {
+        // Owner is the initial contract signature signer
+        address oldContractSignatureSigner = wallet.owner();
+
+        vm.startPrank(owner);
+        // First update
+        wallet.removeContractSignatureSigner(oldContractSignatureSigner);
+        assertFalse(wallet.isContractSignatureSigner(oldContractSignatureSigner));
+
+        vm.expectEmit(true, false, false, false, address(wallet));
+        emit ContractSignatureSigners.ContractSignatureSignerRemoved(oldContractSignatureSigner);
+        // Second update
+        wallet.removeContractSignatureSigner(oldContractSignatureSigner);
+        vm.stopPrank();
+
+        assertFalse(wallet.isContractSignatureSigner(oldContractSignatureSigner));
+    }
+
+    function test_renounceOwnership_isDisabled() public {
+        vm.prank(owner);
+        vm.expectRevert(GatewayWallet.RenounceOwnershipDisabled.selector);
+        wallet.renounceOwnership();
     }
 }

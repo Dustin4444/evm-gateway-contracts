@@ -24,6 +24,35 @@ import {ContractSignersAllowlist} from "src/modules/wallet/ContractSignersAllowl
 import {Deposits} from "src/modules/wallet/Deposits.sol";
 import {Withdrawals} from "src/modules/wallet/Withdrawals.sol";
 
+/// @notice Initialization configuration for `GatewayWallet`.
+///
+/// @dev Passed as a single struct so the function ABI decoder uses calldata-pointer access instead of one stack slot
+/// per address, which keeps `via_ir` codegen within Solidity's stack-depth limit.
+struct GatewayWalletInitConfig {
+    /// The address to initialize the `pauser` role
+    address pauser;
+    /// The address to initialize the `denylister` role
+    address denylister;
+    /// The list of tokens to support initially
+    address[] supportedTokens;
+    /// The operator-issued identifier for this chain
+    uint32 domain;
+    /// The initial value for `withdrawalDelay`, in blocks
+    uint256 withdrawalDelay;
+    /// The address to initialize the `burnSigner` role
+    address burnSigner;
+    /// The address to initialize the `feeRecipient` role
+    address feeRecipient;
+    /// The address to initialize the `contractSignersAllowlister` role
+    address contractSignersAllowlister;
+    /// The address to initialize the `contractSignersDisallowlister` role
+    address contractSignersDisallowlister;
+    /// The address to initialize the `contractSignatureSigner` role
+    address contractSignatureSigner;
+    /// The address to initialize the `batchSigner` role
+    address batchSigner;
+}
+
 /// @title GatewayWallet
 ///
 /// @notice This contract allows users to deposit supported tokens. Once deposits are observed in a finalized block by
@@ -54,6 +83,9 @@ import {Withdrawals} from "src/modules/wallet/Withdrawals.sol";
 /// operator in a finalized block. If a double-spend was attempted, the contract will burn the user's funds from both
 /// their `available` and `withdrawing` balances.
 contract GatewayWallet is GatewayCommon, Deposits, Withdrawals, ContractSignersAllowlist, Burns, Batches {
+    /// Thrown when attempting to renounce ownership
+    error RenounceOwnershipDisabled();
+
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
         // Ensure that the implementation contract cannot be initialized, only the proxy
@@ -65,30 +97,19 @@ contract GatewayWallet is GatewayCommon, Deposits, Withdrawals, ContractSignersA
     /// @dev Assumes the contract is being deployed behind a proxy and that the proxy has already been initialized using
     ///      the `UpgradeablePlaceholder` contract
     ///
-    /// @param pauser_                        The address to initialize the `pauser` role
-    /// @param denylister_                    The address to initialize the `denylister` role
-    /// @param supportedTokens_               The list of tokens to support initially
-    /// @param domain_                        The operator-issued identifier for this chain
-    /// @param withdrawalDelay_               The initial value for `withdrawalDelay`, in blocks
-    /// @param burnSigner_                    The address to initialize the `burnSigner` role
-    /// @param feeRecipient_                  The address to initialize the `feeRecipient` role
-    /// @param contractSignersAllowlister_    The address to initialize the `contractSignersAllowlister` role
-    /// @param batchSigner_                   The address to initialize the `batchSigner` role
-    function initialize(
-        address pauser_,
-        address denylister_,
-        address[] calldata supportedTokens_,
-        uint32 domain_,
-        uint256 withdrawalDelay_,
-        address burnSigner_,
-        address feeRecipient_,
-        address contractSignersAllowlister_,
-        address batchSigner_
-    ) external reinitializer(2) {
-        __GatewayCommon_init(pauser_, denylister_, supportedTokens_, domain_);
-        __Withdrawals_init(withdrawalDelay_);
-        __ContractSignersAllowlist_init(contractSignersAllowlister_);
-        __Burns_init(burnSigner_, feeRecipient_);
-        __Batches_init(batchSigner_);
+    /// @param config   Initialization configuration. See `GatewayWalletInitConfig`.
+    function initialize(GatewayWalletInitConfig calldata config) external reinitializer(2) {
+        __GatewayCommon_init(config.pauser, config.denylister, config.supportedTokens, config.domain);
+        __Withdrawals_init(config.withdrawalDelay);
+        __ContractSignersAllowlist_init(config.contractSignersAllowlister, config.contractSignersDisallowlister);
+        __Burns_init(config.burnSigner, config.feeRecipient);
+        __ContractSignatureSigners_init(config.contractSignatureSigner);
+        __Batches_init(config.batchSigner);
+    }
+
+    /// @notice Renouncing ownership is disabled to prevent accidental loss of contract control
+    /// @dev Overrides OwnableUpgradeable.renounceOwnership() to always revert
+    function renounceOwnership() public view override onlyOwner {
+        revert RenounceOwnershipDisabled();
     }
 }

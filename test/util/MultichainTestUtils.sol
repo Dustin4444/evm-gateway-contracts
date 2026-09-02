@@ -187,11 +187,26 @@ contract MultichainTestUtils is DeployUtils, SignatureTestUtils {
         uint256 expectedTotalBurntAmount,
         uint256 expectedTotalFeeAmount
     ) internal {
+        _burnFromChain(
+            chain, encodedBurnAuth, burnSignature, depositor, expectedTotalBurntAmount, expectedTotalFeeAmount
+        );
+    }
+
+    function _burnFromChain(
+        ChainSetup memory chain,
+        bytes memory encodedBurnAuth,
+        bytes memory burnSignature,
+        address depositor_,
+        uint256 expectedTotalBurntAmount,
+        uint256 expectedTotalFeeAmount
+    ) internal {
         bytes[] memory allBurnAuths = new bytes[](1);
         allBurnAuths[0] = encodedBurnAuth;
         bytes[] memory allSignatures = new bytes[](1);
         allSignatures[0] = burnSignature;
-        _burnFromChainMulti(chain, allBurnAuths, allSignatures, expectedTotalBurntAmount, expectedTotalFeeAmount);
+        _burnFromChainMulti(
+            chain, allBurnAuths, allSignatures, depositor_, expectedTotalBurntAmount, expectedTotalFeeAmount
+        );
     }
 
     function _burnFromChainMulti(
@@ -201,11 +216,24 @@ contract MultichainTestUtils is DeployUtils, SignatureTestUtils {
         uint256 expectedTotalBurntAmount,
         uint256 expectedTotalFeeAmount
     ) internal {
+        _burnFromChainMulti(
+            chain, encodedBurnAuths, burnSignatures, depositor, expectedTotalBurntAmount, expectedTotalFeeAmount
+        );
+    }
+
+    function _burnFromChainMulti(
+        ChainSetup memory chain,
+        bytes[] memory encodedBurnAuths,
+        bytes[] memory burnSignatures,
+        address depositor_,
+        uint256 expectedTotalBurntAmount,
+        uint256 expectedTotalFeeAmount
+    ) internal {
         vm.selectFork(chain.forkId);
 
         // Record state before burn
         uint256 totalSupplyBefore = chain.usdc.totalSupply();
-        uint256 depositorTotalBalanceBefore = chain.wallet.totalBalance(address(chain.usdc), depositor);
+        uint256 depositorTotalBalanceBefore = chain.wallet.totalBalance(address(chain.usdc), depositor_);
         uint256 feeRecipientBalanceBefore = chain.usdc.balanceOf(chain.wallet.feeRecipient());
 
         // Prepare burn intent parameters
@@ -223,7 +251,7 @@ contract MultichainTestUtils is DeployUtils, SignatureTestUtils {
             "Total supply should decrease by expected amount"
         );
         assertEq(
-            chain.wallet.totalBalance(address(chain.usdc), depositor),
+            chain.wallet.totalBalance(address(chain.usdc), depositor_),
             depositorTotalBalanceBefore - expectedTotalBurntAmount - expectedTotalFeeAmount,
             "Depositor balance should decrease by expected burnt amount plus fees"
         );
@@ -240,11 +268,21 @@ contract MultichainTestUtils is DeployUtils, SignatureTestUtils {
         bytes memory attestationSignature,
         uint256 expectedTotalMinted
     ) internal {
+        _mintFromChain(chain, encodedAttestation, attestationSignature, recipient, expectedTotalMinted);
+    }
+
+    function _mintFromChain(
+        ChainSetup memory chain,
+        bytes memory encodedAttestation,
+        bytes memory attestationSignature,
+        address recipient_,
+        uint256 expectedTotalMinted
+    ) internal {
         vm.selectFork(chain.forkId);
 
         // Record state before mint
         uint256 totalSupplyBefore = chain.usdc.totalSupply();
-        uint256 recipientBalanceBefore = chain.usdc.balanceOf(recipient);
+        uint256 recipientBalanceBefore = chain.usdc.balanceOf(recipient_);
 
         // Execute mint operation
         vm.prank(destinationCaller);
@@ -257,7 +295,7 @@ contract MultichainTestUtils is DeployUtils, SignatureTestUtils {
             "Total supply should increase by expected amount"
         );
         assertEq(
-            chain.usdc.balanceOf(recipient),
+            chain.usdc.balanceOf(recipient_),
             recipientBalanceBefore + expectedTotalMinted,
             "Recipient balance should increase by total minted amount"
         );

@@ -42,7 +42,7 @@ for chain in ${chains[@]}; do
   echo "=== Running tests on chain: ${chain} ==="
   echo
 
-  forge test ${forge_test_args[@]}
+  FOUNDRY_PROFILE=test forge test ${forge_test_args[@]}
   result=$?
 
   if [[ ${result} != 0 ]]; then

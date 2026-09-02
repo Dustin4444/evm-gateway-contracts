@@ -30,13 +30,21 @@ import {Cursor} from "src/lib/Cursor.sol";
 import {EIP712Domain} from "src/lib/EIP712Domain.sol";
 import {TransferSpecLib} from "src/lib/TransferSpecLib.sol";
 import {Balances} from "src/modules/wallet/Balances.sol";
+import {ContractSignatureSigners} from "src/modules/wallet/ContractSignatureSigners.sol";
 import {ContractSignersAllowlist} from "src/modules/wallet/ContractSignersAllowlist.sol";
 import {Delegation} from "src/modules/wallet/Delegation.sol";
 
 /// @title Burns
 ///
 /// @notice Manages burns for the `GatewayWallet` contract
-contract Burns is GatewayCommon, Balances, Delegation, ContractSignersAllowlist, EIP712Domain {
+contract Burns is
+    GatewayCommon,
+    Balances,
+    Delegation,
+    ContractSignersAllowlist,
+    ContractSignatureSigners,
+    EIP712Domain
+{
     using TransferSpecLib for bytes29;
     using BurnIntentLib for bytes29;
     using BurnIntentLib for Cursor;
@@ -313,16 +321,41 @@ contract Burns is GatewayCommon, Balances, Delegation, ContractSignersAllowlist,
         // Get the source signer from the cursor (for sets, this gets the first intent's signer)
         address sourceSigner = BurnIntentLib._getSourceSignerFromCursor(cursor);
 
+        // Attempt ECDSA recovery - used by EOA and TEE vouch paths
+        // Use tryRecover to gracefully handle non-standard signature formats that EIP-1271 contracts may accept
+        (address recoveredSigner, ECDSA.RecoverError err,) = ECDSA.tryRecover(digest, signature);
+
+        // If ECDSA recovery succeeded, check EOA and TEE paths
+        if (err == ECDSA.RecoverError.NoError) {
+            // Path 1: EOA (most common - optimized for gas efficiency)
+            // Standard ECDSA signature where recovered signer matches source signer
+            if (recoveredSigner == sourceSigner) {
+                return sourceSigner;
+            }
+
+            // Path 2: TEE vouch - recovered signer is a registered TEE that has vouched for sourceSigner
+            // This enables TEE to vouch for contracts, including those previously using EIP-1271
+            if (isContractSignatureSigner(recoveredSigner)) {
+                return sourceSigner;
+            }
+        }
+
+        // Path 3: Allowlisted contracts use EIP-1271 signature validation
         if (_wasEverAllowlistedContractSigner(sourceSigner)) {
-            // For allowlisted contracts, use EIP-1271 signature validation
             if (!SignatureChecker.isValidERC1271SignatureNow(sourceSigner, digest, signature)) {
                 revert InvalidSignature();
             }
             return sourceSigner;
-        } else {
-            // For EOAs and non-whitelisted contracts, use ECDSA recovery
-            return ECDSA.recover(digest, signature);
         }
+
+        // If ECDSA recovery failed and no other path matched, invalid signature
+        if (err != ECDSA.RecoverError.NoError) {
+            revert InvalidSignature();
+        }
+
+        // ECDSA recovery succeeded but didn't match EOA or TEE paths
+        // Return recovered signer - downstream validation in _validateBurnIntentTransferSpec will catch the mismatch
+        return recoveredSigner;
     }
 
     /// Iterates through a set of burn intents, validating and processing each relevant one
@@ -442,7 +475,11 @@ contract Burns is GatewayCommon, Balances, Delegation, ContractSignersAllowlist,
             revert UnsupportedTokenAtIndex(index, sourceToken);
         }
 
-        // Ensure that the signer of the burn intent matches what was provided in the `TransferSpec`
+        // Ensure that the signer of the burn intent matches what was provided in the transfer spec.
+        // Note: For TEE vouch and EIP-1271 paths, this check is always true (sourceSigner == sourceSigner)
+        // since _validateSignatureAndGetSigner returns sourceSigner for those paths.
+        // For EOA path, this validates that the recovered signer matches the transfer spec.
+        // This check serves as defense-in-depth to catch any logic errors in signature validation.
         address sourceSigner = AddressLib._bytes32ToAddress(spec.getSourceSigner());
         if (sourceSigner != signer) {
             revert InvalidIntentSourceSignerAtIndex(index, sourceSigner, signer);
